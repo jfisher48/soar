@@ -87,70 +87,152 @@ export default function WorkOrderDetailModal() {
                         <Typography variant="subtitle1" fontWeight={700}>
                             #{headerId}
                         </Typography>
-                        {wo?.status && <Chip size="small" label={wo.status}/>}
-                        {wo?.type && <Chip size="small" variant="outlined" label={wo.type} />}
+                        {!!headerDate && (
+                            <Typography variant="caption" color="text.secondary">
+                                Created: {headerDate}
+                            </Typography>
+                        )}                        
                     </Stack>
-                    <IconButton aria-label="close" onClick={handleClose} sx={{ position: "aboslute", right: 8, top: 8 }}>
+                    <IconButton aria-label="close" onClick={handleClose}>
                     <   CloseIcon />
                     </IconButton>
                 </Stack>                            
             </DialogTitle>
-            <DialogContent dividers>
-                {loading && <Typography>Loading...</Typography>}
-                {err && <Typography color="error">{err}</Typography>}
-                {!loading && !err && !wo && <Typography>Not Found.</Typography>}
+            <DialogContent dividers sx={{ p: 0 }}>
+                {loading && (
+                    <Box sx={{ p: 3 }}>
+                        <Typography>Loading...</Typography>
+                    </Box>
+                )}
+                {err && (
+                    <Box sx={{ p:3 }}>
+                        <Typography color="error">{err}</Typography>
+                    </Box>
+                )}
+                {!loading && !err && !wo && (
+                    <Box sx={{ p:3 }}>
+                        <Typography>Work Order Not Found.</Typography>
+                    </Box>
+                )}
 
                 {!loading && !err && wo && (
-                    <Stack spacing={2}>
-                        <Stack spacing={0.5}>
-                            <Typography variant="subtitle1" fontWeight={700}>
-                                {wo.accountName || wo.account || wo.storeName || "Untitled Account"}
+                    <Box sx={{ p: 3 }}>
+                        <Stack spacing={1.25}>
+                            <Stack direction={{ xs: "column", md: "row"}} justifyContent="space-between" spacing={2}>
+                                <Box>
+                                    <Typography variant="h4" fontWeight={300} sx={{ lineHeight: 1.1}} >
+                                        {wo.account || "Untitled Account"}
+                                    </Typography>
+
+                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                                        <Chip size="small" variant="outlined" label={`WO TYPE: ${wo.orderType} || "-"}`} />
+                                        <Chip size="small" {...statusChipProps(wo.status)} />
+                                        {wo.isRush && <Chip size="small" color="error" label="RUSH" />}                                        
+                                    </Stack>
+                                </Box>
+                                <Stack direction="row" spacing={3} alignItems="flex-end" sx={{ minWidth: 260 }}>
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Lines
+                                        </Typography>
+                                        <Typography variant="h4" fontWeight={300}>
+                                            {itemTotals.lineCount ?? "-"}
+                                        </Typography>
+                                    </Box>
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Strips
+                                        </Typography>
+                                        <Typography variant="h4" fontWeight={300}>
+                                            {itemTotals.stripCount ?? "-"}
+                                        </Typography>
+                                    </Box>
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Cost
+                                        </Typography>
+                                        <Typography variant="h6" fontWeight={500}>
+                                            {money(itemTotals.cost)}
+                                        </Typography>
+                                    </Box>
+                                </Stack>
+                            </Stack>
+
+                            <Divider />
+
+                            {/* Line items list */}
+                            <Typography>
+                                Items
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                ID: {wo.id}
-                            </Typography>
-                        </Stack>
-                        <Divider />
-                        <Stack direction={{ xs: "column", sm: "row"}} spacing={2}>
-                            <div>
-                                <Typography variant="caption" color="text.secondary">
-                                    Created
-                                </Typography>
-                                <Typography variant="body2">
-                                    {formatMaybeTimestamp(wo.createdAt) || "-"}
-                                </Typography>
-                            </div>
-                            <div>
-                                <Typography variant="caption" color="text.secondary">
-                                    Last updated:
-                                </Typography>
-                                <Typography variant="body2">
-                                    {formatMaybeTimestamp(wo.touchedAt) || "-"}
-                                </Typography>
-                            </div>
-                            <div>
-                                <Typography variant="caption" color="text.secondary">
-                                    Assigned to:
-                                </Typography>
-                                <Typography variant="body2">
-                                    {wo.assignedToName || wo.assignedTo || "-"}
-                                </Typography>
-                            </div>
-                        </Stack>
-                        <Divider />
-                        {/* Temporary raw dump */}
-                        <Typography variant="subtitle2" fontWeight={700}>
-                            Fields
-                        </Typography>
-                        <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
-                            {JSON.stringify(wo, null, 2)}
-                        </pre>
-                    </Stack>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell sx={{ width: 70 }}><b>QTY</b></TableCell>
+                                        <TableCell><b>ITEM</b></TableCell>
+                                        <TableCell sx={{ width: 140 }}><b>PACKAGE</b></TableCell>
+                                        <TableCell sx={{ width: 110 }} align="right"><b>PRICE</b></TableCell>
+                                        <TableCell sx={{ width: 130 }}><b>EXTRA</b></TableCell>                                        
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {items.map((it) => (
+                                      <TableRow key={it.id ?? `${it.brand}-${it.pkg}-${it.price}`}>
+                                        <TableCell>{it.quantity ?? ""}</TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2" fontWeight={600}>
+                                                {it.brand || "-"}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {it.pkg || "-"}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            <Typography variant="body2">
+                                                {money(it.price)}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2" color="text.secondary">
+                                                {it.extText || ""}
+                                            </Typography>
+                                        </TableCell>                                        
+                                      </TableRow>  
+                                    ))}
+
+                                    {items.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={5}>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    No Items on this work order.
+                                                </Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </Stack>                    
+                    </Box>
                 )}
-            </DialogContent>
+                </DialogContent>
 
+                <DialogActions sx={{ px:3, py: 2 }}>
+                    <Stack direction="row" spacing={1} sx={{ flex: 1 }}>
+                        <Button variant="contained" color="primary" disabled>
+                            COMPLETE
+                        </Button>
+                        <Button variant="outlined" color="warning" disabled>
+                            HOLD
+                        </Button>
+                        <Button variant="outlined" disabled>
+                            EDIT ORDER
+                        </Button>                       
+                    </Stack>
+                    <Button variant="contained" color="success" disabled>
+                        GENERATE
+                    </Button>
+                </DialogActions>
         </Dialog>
-    )
-
-
+    );
 }
