@@ -1,0 +1,16 @@
+{
+  "name": "jockos-sign-spike",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "run": "node -r @babel/register src/index.jsx"
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/register": "^7.23.0",
+    "@babel/preset-react": "^7.22.15"
+  }
+}

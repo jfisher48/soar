@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Box, Button, Dialog, DialogActions, DialogTitle, DialogContent, IconButton, Typography, Stack, Chip, Divider, Table, TableBody, TableCell, TableHead, TableRow } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogTitle, DialogContent, IconButton, Typography, Stack, Chip, Divider, Table, TableBody, TableCell, TableHead, TableRow, Grid } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { fetchWorkOrderById } from "../services/workOrders";
 import { Close } from "@mui/icons-material";
@@ -18,6 +18,23 @@ function formatMaybeTimestamp(v) {
     return "";
   } catch {
     return "";
+  }
+}
+
+function formatShortDate(v) {
+  try {
+    if (v?.toDate) v = v.toDate();
+    if (typeof v?.seconds === "number") v = new Date(v.seconds * 1000);
+    if (typeof v === "string") v = new Date(v);
+    if (!(v instanceof Date) || isNaN(v)) return "—";
+
+    return v.toLocaleDateString("en-US", {
+      month: "short",
+      day: "2-digit",
+      year: "2-digit",
+    }).replace(",", "");
+  } catch {
+    return "—";
   }
 }
 
@@ -67,7 +84,7 @@ export default function WorkOrderDetailModal() {
     }, [id]);
 
     const headerId = wo?.workorderNumber || wo?.id || id;
-    const headerDate = wo?.createdAt ? formatMaybeTimestamp(wo.createdAt) : "";
+    const headerDate = wo?.dueDate ? formatMaybeTimestamp(wo.dueDate) : "";
 
     const items = Array.isArray(wo?.items) ? wo.items : [];
 
@@ -81,24 +98,24 @@ export default function WorkOrderDetailModal() {
 
     return (
         <Dialog open onClose={handleClose} fullWidth maxWidth="lg">
-            <DialogTitle sx={{ pr: 6 }}>
-                <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-                    <Stack spacing={0.25}>
-                        <Typography variant="subtitle1" fontWeight={700}>
-                            #{headerId}
-                        </Typography>
-                        {!!headerDate && (
-                            <Typography variant="caption" color="text.secondary">
-                                Created: {headerDate}
-                            </Typography>
-                        )}                        
-                    </Stack>
-                    <IconButton aria-label="close" onClick={handleClose}>
-                    <   CloseIcon />
-                    </IconButton>
+            <DialogTitle sx={{ pr: 6, backgroundColor: "rgba(229,239,247,1)", borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
+                <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">                    
+                    <Typography variant="h6" fontWeight={700} color="#4e5262">
+                        #{headerId}
+                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography fontSize="0.875rem" fontWeight={500} color="#4e5262">
+                            {formatShortDate(wo?.dueDate)}
+                        </Typography>                                               
+                    
+                        <IconButton aria-label="close" onClick={handleClose}>
+                            <CloseIcon />
+                        </IconButton>                        
+                    </Stack>                   
                 </Stack>                            
             </DialogTitle>
-            <DialogContent dividers sx={{ p: 0 }}>
+            {/* Adjust height of content possibly */}
+            <DialogContent sx={{ p: 0, display: "flex", flexDirection: "column", height: "75vh" }}>
                 {loading && (
                     <Box sx={{ p: 3 }}>
                         <Typography>Loading...</Typography>
@@ -120,43 +137,70 @@ export default function WorkOrderDetailModal() {
                         <Stack spacing={1.25}>
                             <Stack direction={{ xs: "column", md: "row"}} justifyContent="space-between" spacing={2}>
                                 <Box>
-                                    <Typography variant="h4" fontWeight={300} sx={{ lineHeight: 1.1}} >
+                                    <Typography variant="h3" fontWeight={300} sx={{ lineHeight: 1.1, maxWidth: { xs: "100%", md: 560 }, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}} >
                                         {wo.account || "Untitled Account"}
-                                    </Typography>
-
-                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
-                                        <Chip size="small" variant="outlined" label={`WO TYPE: ${wo.orderType} || "-"}`} />
-                                        <Chip size="small" {...statusChipProps(wo.status)} />
-                                        {wo.isRush && <Chip size="small" color="error" label="RUSH" />}                                        
-                                    </Stack>
+                                    </Typography>                                   
                                 </Box>
-                                <Stack direction="row" spacing={3} alignItems="flex-end" sx={{ minWidth: 260 }}>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Lines
-                                        </Typography>
-                                        <Typography variant="h4" fontWeight={300}>
-                                            {itemTotals.lineCount ?? "-"}
-                                        </Typography>
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Strips
-                                        </Typography>
-                                        <Typography variant="h4" fontWeight={300}>
-                                            {itemTotals.stripCount ?? "-"}
-                                        </Typography>
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Cost
-                                        </Typography>
-                                        <Typography variant="h6" fontWeight={500}>
-                                            {money(itemTotals.cost)}
-                                        </Typography>
-                                    </Box>
-                                </Stack>
+                                
                             </Stack>
+                            <Box sx={{ minWidth: 340 }}>
+                                <Grid container columnSpacing={2} rowSpacing={0.5}>                                    
+                                    <Grid size={{ xs: 12 }}>                                        
+                                        <Typography variant="subtitle2" sx={{ color: "rgba(0,0,0,0.87)", fontWeight: "400" }}>
+                                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1}}>
+                                                WO TYPE:
+                                            </Box>                                            
+                                                {wo.orderType || "N/A"}                                                                                       
+                                        </Typography>                                        
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6 }}>                                        
+                                        <Typography variant="subtitle2" sx={{ color: "rgba(0,0,0,0.87)", fontWeight: "400" }}>
+                                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1}}>
+                                                CREATED BY:
+                                            </Box>                                            
+                                                {wo.requestedBy || "N/A"}                                                                                       
+                                        </Typography>                                        
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6 }}>                                        
+                                        <Typography variant="subtitle2" sx={{ color: "rgba(0,0,0,0.87)", fontWeight: "400" }}>
+                                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1}}>
+                                                CREATED ON:
+                                            </Box>                                            
+                                                {formatMaybeTimestamp(wo.createdAt) || "N/A"}                                                                                       
+                                        </Typography>                                        
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6 }}>                                        
+                                        <Typography variant="subtitle2" sx={{ color: "rgba(0,0,0,0.87)", fontWeight: "400", }}>
+                                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1}}>
+                                                ASSIGNED TO:
+                                            </Box>                                            
+                                                {wo.assignedToName || "N/A"}                                                                                       
+                                        </Typography>                                        
+                                    </Grid>                                    
+                                    <Grid size={{ xs: 12, sm: 6 }}>                                        
+                                        <Typography variant="subtitle2" sx={{ color: "rgba(0,0,0,0.87)", fontWeight: "400" }}>
+                                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1}}>
+                                                DUE ON:
+                                            </Box>                                            
+                                                {formatMaybeTimestamp(wo.dueDate) || "N/A"}                                                                                       
+                                        </Typography>                                        
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6 }}>                                        
+                                        <Typography variant="subtitle2" sx={{ color: "rgba(0,0,0,0.87)", fontWeight: "400", textTransform: "capitalize" }}>
+                                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1}}>
+                                                STATUS:
+                                            </Box>                                            
+                                                {wo.status || "N/A"}                                                                                       
+                                        </Typography>                                        
+                                    </Grid>
+                                    {wo.isRush && (
+                                        <Grid size={{ xs: 12, sm: 6 }}>
+                                            <Chip label="PLEASE RUSH" color="error" size="small" sx={{ borderRadius: 1, fontWeight: 600 }} />                                             
+                                        </Grid>
+                                    )}                                    
+                                    
+                                </Grid>
+                            </Box>
 
                             <Divider />
 
