@@ -45,6 +45,7 @@ function drawFilledTriangle(page, p1, p2, p3, fillColor, strokeColor = null, str
 
 const WHITE = hexToRgb("#FFFFFF");
 const ULTRA_RED = hexToRgb("#c8102e");
+const ULTRA_BLUE =hexToRgb("#2F4487")
 const GOLD = hexToRgb("#D4AF37");
 
 async function run() {
@@ -176,18 +177,6 @@ async function run() {
     mustBeNumber("stripeY1", stripeY1);
     mustBeNumber("stripeY2", stripeY2);
 
-
-    console.log("Stripe debug", {
-        zoneY,
-        RIBBON_Y,
-        RIBBON_H,   
-        PIZZA_STRIPE_H,
-        PIZZA_STRIPE_INSET,
-        stripeY1,
-        stripeY2
-    });
-
-
     //Gold Stripes
     page.drawRectangle({
         x: RIBBON_X,
@@ -227,6 +216,10 @@ async function run() {
     WHITE
     );
 
+    
+    const pizzaName = "THE BIG DILL";
+    const pizzaPrices = "LG $17.99  MD $15.99  SM $11.99";
+
     const pizzaRibbonText = "PIZZA OF THE MONTH";
     const pizzaRibbonFontSize = 34;
     const pizzaRibbonTextWidth = font.widthOfTextAtSize(pizzaRibbonText, pizzaRibbonFontSize);
@@ -238,6 +231,55 @@ async function run() {
         size: pizzaRibbonFontSize,
         font,
         color: WHITE
+    });
+
+    // Pizza Name
+
+    const GAP_BELOW_RIBBON = 0.233 * INCH;
+    const nameFontSize = 42;
+    const nameTextW = font.widthOfTextAtSize(pizzaName, nameFontSize);
+    const nameTextH = font.heightAtSize(nameFontSize);
+
+    const nameX = zoneX + (ZONE_WIDTH - nameTextW) / 2;
+    const nameY = RIBBON_Y - GAP_BELOW_RIBBON - nameTextH;
+
+    page.drawText(pizzaName, {
+        x: nameX,
+        y: nameY + BASELINE_TWEAK,
+        size: nameFontSize,
+        font,
+        color: ULTRA_BLUE
+    });
+
+    // Gold Underline
+
+    const UNDERLINE_GAP = 0.11* INCH;
+    const UNDERLINE_H = 0.015 * INCH;
+    const UNDERLINE_PAD = 0.125 * INCH;
+    
+    page.drawRectangle({
+        x: nameX - UNDERLINE_PAD,
+        y: nameY - UNDERLINE_GAP,
+        width: nameTextW + (UNDERLINE_PAD * 2),
+        height: UNDERLINE_H,
+        color: GOLD
+    });
+
+    // Pizza Prices
+
+    const GAP_BELOW_NAME = 0.15 * INCH;
+    const priceFontSize = 24;
+    const priceTextW = font.widthOfTextAtSize(pizzaPrices, priceFontSize);
+    const priceTextH = font.heightAtSize(priceFontSize);
+
+    const priceY = nameY - UNDERLINE_GAP - UNDERLINE_H - GAP_BELOW_NAME - priceTextH;
+
+    page.drawText(pizzaPrices, {
+        x: zoneX + (ZONE_WIDTH - priceTextW) /2,
+        y: priceY + BASELINE_TWEAK,
+        size: priceFontSize,
+        font,
+        color: ULTRA_BLUE
     });
 
     const pdfBytes = await pdfDoc.save();
