@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Box, Button, Dialog, DialogActions, DialogTitle, DialogContent, IconButton, Typography, Stack, Chip, Divider, Table, TableBody, TableCell, TableHead, TableRow, Grid } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogTitle, DialogContent, IconButton, Typography, Stack, Chip, Divider, Grid } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { fetchWorkOrderById } from "../services/workOrders";
-import { Close } from "@mui/icons-material";
+import ShelfStripsBody from "./shelfstrips/ShelfStripsBody";
 
 function formatMaybeTimestamp(v) {
   try {
@@ -95,6 +95,8 @@ export default function WorkOrderDetailModal() {
         return { lineCount, stripCount, cost };
 
     }, [wo, items.length]);
+
+    const isShelfStrips = String(wo?.orderType || "").toLowerCase() === "shelf strips";
 
     return (
         <Dialog open onClose={handleClose} fullWidth maxWidth="lg">
@@ -205,57 +207,13 @@ export default function WorkOrderDetailModal() {
                             <Divider />
 
                             {/* Line items list */}
-                            <Typography>
-                                Items
-                            </Typography>
-                            <Table size="small">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell sx={{ width: 70 }}><b>QTY</b></TableCell>
-                                        <TableCell><b>ITEM</b></TableCell>
-                                        <TableCell sx={{ width: 140 }}><b>PACKAGE</b></TableCell>
-                                        <TableCell sx={{ width: 110 }} align="right"><b>PRICE</b></TableCell>
-                                        <TableCell sx={{ width: 130 }}><b>EXTRA</b></TableCell>                                        
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {items.map((it) => (
-                                      <TableRow key={it.id ?? `${it.brand}-${it.pkg}-${it.price}`}>
-                                        <TableCell>{it.quantity ?? ""}</TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2" fontWeight={600}>
-                                                {it.brand || "-"}
-                                            </Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {it.pkg || "-"}
-                                            </Typography>
-                                        </TableCell>
-                                        <TableCell align="right">
-                                            <Typography variant="body2">
-                                                {money(it.price)}
-                                            </Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {it.extText || ""}
-                                            </Typography>
-                                        </TableCell>                                        
-                                      </TableRow>  
-                                    ))}
-
-                                    {items.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={5}>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    No Items on this work order.
-                                                </Typography>
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
+                            {isShelfStrips ? (
+                                <ShelfStripsBody wo={wo} money={money} />
+                            ) : ( 
+                                <Typography variant="body2" color="text.secondary">
+                                    No renderer yet for this work order type.
+                                </Typography>
+                            )}                            
                         </Stack>                    
                     </Box>
                 )}

@@ -42,6 +42,215 @@ function drawFilledTriangle(page, p1, p2, p3, fillColor, strokeColor = null, str
   page.pushOperators(...ops);
 }
 
+function fitFontSizeToWidth(font, text, maxWidth, startSize, minSize) {
+  let size = startSize;
+  while (size >= minSize) {
+    const w = font.widthOfTextAtSize(text, size);
+    if (w <= maxWidth) return size;
+    size -= 1;
+  }
+  return minSize;
+}
+
+function wrapTextToWidth(font, text, fontSize, maxWidth, maxLines = 2) {
+  const words = text.trim().split(/\s+/);
+  const lines = [];
+  let line = "";
+
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    const w = font.widthOfTextAtSize(test, fontSize);
+    if (w <= maxWidth) {
+      line = test;
+    } else {
+      if (line) lines.push(line);
+      line = word;
+      if (lines.length === maxLines - 1) break;
+    }
+  }
+
+  if (line && lines.length < maxLines) lines.push(line);
+
+  // If we still have leftover words, append ellipsis to last line (optional)
+  if (lines.length === maxLines && words.join(" ").length > lines.join(" ").length) {
+    const last = lines[maxLines - 1];
+    let trimmed = last;
+    while (trimmed.length > 0 && font.widthOfTextAtSize(trimmed + "…", fontSize) > maxWidth) {
+      trimmed = trimmed.slice(0, -1);
+    }
+    lines[maxLines - 1] = trimmed ? trimmed + "…" : last;
+  }
+
+  return lines;
+}
+
+function drawSpecialCard(page, {
+  x, y, w, h,
+  title, desc, price,
+  font,
+  color,
+  INCH,
+  BASELINE_TWEAK,
+  debugBorder = false
+}) {
+  // Force ALL CAPS and handle null/undefined gracefully
+  const T = (title ?? "").toString().trim().toUpperCase();
+  const D = (desc ?? "").toString().trim().toUpperCase();
+  const P = (price ?? "").toString().trim().toUpperCase();
+
+  const hasTitle = T.length > 0;
+  const hasDesc  = D.length > 0;
+  const hasPrice = P.length > 0;
+
+  // If literally nothing, don't draw anything
+  if (!hasTitle && !hasDesc && !hasPrice) return;
+
+  // Inner padding inside the card
+  const padX = 0.40 * INCH;
+  const padY = 0.40 * INCH;
+
+  const innerX = x + padX;
+  const innerY = y + padY;
+  const innerW = w - padX * 2;
+  const innerH = h - padY * 2;
+
+  // Gaps (only applied when both sections exist)
+  const gapTitleToDesc = 0.10 * INCH;
+  const gapDescToPrice = 0.18 * INCH;
+  const lineGapTitle = 0.06 * INCH;
+  const lineGapDesc = 0.05 * INCH;
+
+  // Start sizes (big)
+  let titleSize = 62;
+  let descSize  = 34;
+  let priceSize = 82;
+
+  const MIN_TITLE = 24;
+  const MIN_DESC  = 18;
+  const MIN_PRICE = 32;
+
+  const maxTitleLines = 2;
+  const maxDescLines  = 2;
+
+  const measure = (tSize, dSize, pSize) => {
+    const tLines = hasTitle ? wrapTextToWidth(font, T, tSize, innerW, maxTitleLines) : [];
+    const dLines = hasDesc  ? wrapTextToWidth(font, D, dSize, innerW, maxDescLines)  : [];
+
+    const titleTooWide = tLines.some(l => font.widthOfTextAtSize(l, tSize) > innerW);
+    const descTooWide  = dLines.some(l => font.widthOfTextAtSize(l, dSize) > innerW);
+    const priceTooWide = hasPrice ? (font.widthOfTextAtSize(P, pSize) > innerW) : false;
+
+    const tLineH = hasTitle ? font.heightAtSize(tSize) : 0;
+    const dLineH = hasDesc  ? font.heightAtSize(dSize) : 0;
+    const pH     = hasPrice ? font.heightAtSize(pSize) : 0;
+
+    const tH = hasTitle ? (tLines.length * tLineH + (tLines.length - 1) * lineGapTitle) : 0;
+    const dH = hasDesc  ? (dLines.length * dLineH + (dLines.length - 1) * lineGapDesc) : 0;
+
+    // Conditional gaps
+    const gapTD = (hasTitle && hasDesc) ? gapTitleToDesc : 0;
+    const gapDP = (hasDesc && hasPrice) ? gapDescToPrice : 0;
+    const gapTP = (hasTitle && !hasDesc && hasPrice) ? gapDescToPrice : 0; // title→price gap when no desc
+
+    const contentH = tH + gapTD + dH + (hasDesc ? gapDP : gapTP) + pH;
+
+    return { tLines, dLines, tSize, dSize, pSize, tLineH, dLineH, pH, tH, dH, contentH, titleTooWide, descTooWide, priceTooWide, gapTD, gapBetweenTextAndPrice: (hasDesc ? gapDP : gapTP) };
+  };
+
+  let m = measure(titleSize, descSize, priceSize);
+
+  // Shrink loop: reduce until it fits and nothing exceeds width
+  while (
+    (m.contentH > innerH || m.titleTooWide || m.descTooWide || m.priceTooWide) &&
+    (titleSize > MIN_TITLE || descSize > MIN_DESC || priceSize > MIN_PRICE)
+  ) {
+    // shrink what exists; keep price dominant but allow it to shrink if needed
+    if (hasTitle && (m.contentH > innerH || m.titleTooWide)) titleSize -= 2;
+    if (hasDesc  && (m.contentH > innerH || m.descTooWide))  descSize  -= 1;
+    if (hasPrice && (m.contentH > innerH || m.priceTooWide)) priceSize -= 2;
+
+    if (titleSize < MIN_TITLE) titleSize = MIN_TITLE;
+    if (descSize  < MIN_DESC)  descSize  = MIN_DESC;
+    if (priceSize < MIN_PRICE) priceSize = MIN_PRICE;
+
+    m = measure(titleSize, descSize, priceSize);
+  }
+
+  if (debugBorder) {
+    page.drawRectangle({
+      x, y, width: w, height: h,
+      borderColor: color,
+      borderWidth: 1
+    });
+    page.drawRectangle({
+      x: innerX, y: innerY, width: innerW, height: innerH,
+      borderColor: rgb(0.7, 0.7, 0.7),
+      borderWidth: 0.5
+    });
+  }
+
+  // Center the full content stack in the inner rect
+  let cursorY = innerY + (innerH + m.contentH) / 2; // top edge of content block
+
+  // Draw title
+  if (hasTitle) {
+    cursorY -= m.tLineH;
+    for (let i = 0; i < m.tLines.length; i++) {
+      const line = m.tLines[i];
+      const lineW = font.widthOfTextAtSize(line, m.tSize);
+      page.drawText(line, {
+        x: innerX + (innerW - lineW) / 2,
+        y: cursorY + BASELINE_TWEAK,
+        size: m.tSize,
+        font,
+        color
+      });
+      cursorY -= (m.tLineH + lineGapTitle);
+    }
+    cursorY += lineGapTitle; // undo last extra gap
+  }
+
+  // Gap between title and desc
+  if (hasTitle && hasDesc) cursorY -= m.gapTD;
+
+  // Draw desc
+  if (hasDesc) {
+    cursorY -= m.dLineH;
+    for (let i = 0; i < m.dLines.length; i++) {
+      const line = m.dLines[i];
+      const lineW = font.widthOfTextAtSize(line, m.dSize);
+      page.drawText(line, {
+        x: innerX + (innerW - lineW) / 2,
+        y: cursorY + BASELINE_TWEAK,
+        size: m.dSize,
+        font,
+        color
+      });
+      cursorY -= (m.dLineH + lineGapDesc);
+    }
+    cursorY += lineGapDesc;
+  }
+
+  // Gap before price (depends on whether desc exists)
+  if (hasPrice && (hasTitle || hasDesc)) cursorY -= m.gapBetweenTextAndPrice;
+
+  // Draw price
+  if (hasPrice) {
+    cursorY -= m.pH;
+    const priceW = font.widthOfTextAtSize(P, m.pSize);
+    page.drawText(P, {
+      x: innerX + (innerW - priceW) / 2,
+      y: cursorY + BASELINE_TWEAK,
+      size: m.pSize,
+      font,
+      color
+    });
+  }
+}
+
+
+
+
 
 const WHITE = hexToRgb("#FFFFFF");
 const ULTRA_RED = hexToRgb("#c8102e");
@@ -62,9 +271,10 @@ async function run() {
     const MONTH_BAR_HEIGHT = 1 * INCH;
     const STRIPE_H = 0.04 * INCH;
     const STRIPE_INSET = 0.06 * INCH;
+    const GAP_BELOW_MONTH_BAR = 0.20 * INCH;
 
     const PIZZA_MODULE_HEIGHT = 2 * INCH;
-    const PIZZA_GAP_ABOVE = 0.20 * INCH;
+    const GAP_ABOVE_PIZZA = 0.20 * INCH;
 
     const RIBBON_H = 0.7 * INCH;
     const PIZZA_STRIPE_H = 0.03 * INCH;
@@ -147,11 +357,12 @@ async function run() {
         size: monthFontSize,
         font,
         color: rgb(1,1,1)
-    });
+    });    
 
     // Pizza of the Month
 
-    const pizzaModuleY = zoneY;
+    const PIZZA_BOTTOM_INSET = 0.25 * INCH;
+    const pizzaModuleY = zoneY + PIZZA_BOTTOM_INSET;
     const pizzaModuleTopY = pizzaModuleY + PIZZA_MODULE_HEIGHT;
 
     const RIBBON_W = 9.5 * INCH;
@@ -172,8 +383,8 @@ async function run() {
 
     mustBeNumber("RIBBON_Y", RIBBON_Y);
     mustBeNumber("RIBBON_H", RIBBON_H);
-    mustBeNumber("STRIPE_H", PIZZA_STRIPE_H);
-    mustBeNumber("STRIPE_INSET", PIZZA_STRIPE_INSET);
+    mustBeNumber("PIZZA_STRIPE_H", PIZZA_STRIPE_H);
+    mustBeNumber("PIZZA_STRIPE_INSET", PIZZA_STRIPE_INSET);
     mustBeNumber("stripeY1", stripeY1);
     mustBeNumber("stripeY2", stripeY2);
 
@@ -281,6 +492,59 @@ async function run() {
         font,
         color: ULTRA_BLUE
     });
+
+    //Specials Zone
+
+    const specialsTopY = barTopY - GAP_BELOW_MONTH_BAR;
+    const specialsBottomY = pizzaModuleTopY + GAP_ABOVE_PIZZA;
+    const specialsHeight = specialsTopY - specialsBottomY;
+
+    console.log("Specials zone debug (inches)", {
+        top: (specialsTopY / INCH).toFixed(2),
+        bottom: (specialsBottomY / INCH).toFixed(2),
+        height: (specialsHeight / INCH).toFixed(2)
+    });
+
+    if (specialsHeight <=0) {
+        console.warn("Specials zone height is <= 0 Reduce gaps or module heights.")
+    }
+
+    page.drawRectangle({
+        x: zoneX,
+        y: specialsBottomY,
+        width: ZONE_WIDTH,
+        height: specialsHeight,
+        borderColor: rgb(0,0,0),
+        borderWidth: 1
+    });
+
+    // Special Card 1
+
+    const specialTitle = "2 Individual 2-Topping Pizzas 2 Garden Salads and 2 Soft Drinks";
+    const specialDesc = "";
+    const specialPrice = "$34.99"
+
+    const cardPadding = 0.25 * INCH;
+
+    const cardX = zoneX + cardPadding;
+    const cardY = specialsBottomY + cardPadding;
+    const cardW = ZONE_WIDTH - (cardPadding * 2);
+    const cardH = specialsHeight - (cardPadding * 2);
+
+    drawSpecialCard(page, {
+        x: cardX,
+        y: cardY,
+        w: cardW,
+        h: cardH,
+        title: specialTitle,
+        desc: specialDesc,
+        price: specialPrice,
+        font,
+        color: ULTRA_BLUE,
+        INCH,
+        BASELINE_TWEAK,
+        debugBorder: true
+    });    
 
     const pdfBytes = await pdfDoc.save();
     const outPath = path.join(__dirname, "../output/jockos-test.pdf");
