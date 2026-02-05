@@ -77,7 +77,7 @@ export default function AppLayout() {
 
     return(
         
-       <Box sx={{ display: "flex"}}>        
+       <Box sx={{ display: "flex", bgcolor: "rgba(240,243,246,1)" }}>        
         <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1}}>
             <Toolbar>
                 {!isDesktop && (
@@ -123,7 +123,7 @@ export default function AppLayout() {
                 variant="persistent"
                 anchor="left"
                 open={drawerOpen}
-                sx={{ "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" } }}            
+                sx={{ flexShrink: 0, "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" } }}            
             >
                 {drawerContent}
             </Drawer>
@@ -133,7 +133,7 @@ export default function AppLayout() {
             <Drawer
                 variant="permanent"
                 open
-                sx={{ width: drawerWidth, flexShrink: 0, "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" } }}
+                sx={{ flexShrink: 0, "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" } }}
             >
                 {drawerContent}
             </Drawer>
@@ -144,8 +144,9 @@ export default function AppLayout() {
             component="main"
             sx={{
                 flexGrow: 1,
-                p: 3,
-                ml: isDesktop ? `${drawerWidth}px` : isTablet && drawerOpen ? `${drawerWidth}px` : 0, transition: "margin-left 200ms ease" 
+                p: 2,
+                ml: isDesktop ? `${drawerWidth}px` : isTablet && drawerOpen ? `${drawerWidth}px` : 0, transition: "margin-left 200ms ease",
+                bgcolor: "rgba(240,243,246,1)" 
             }}
         >
             <Toolbar />

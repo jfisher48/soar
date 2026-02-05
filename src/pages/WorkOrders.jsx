@@ -16,6 +16,15 @@ export default function WorkOrders() {
     const theme = useTheme();
     const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
 
+    // --- LEGACY-LIKE FIXED CHROME (DESKTOP) ---
+    const TOPBAR_H = 64;        // global app top bar height
+    const PAGEBAR_H = 64;       // WorkOrders page bar (your AppBar with "Work Orders")
+    const STATUSBAR_H = 75;        // status bar height ("Open/Completed/Held" row)
+    const FIXED_TOP = TOPBAR_H + PAGEBAR_H; // top position for status bar + sidebar
+
+    const drawerWidth = 220;    
+    const GUTTER = 24;
+
     useEffect(() => {
         let cancelled = false;
 
@@ -71,31 +80,33 @@ const headingText =
     : "Held Orders";
 
 return (
-    <Box sx= {{ bgcolor: "rgba(240,243,246,1)", minHeight: "100vh", p: 2  }}>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2}}>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-                <Box sx={{ width: 34, height: 34, borderRadius: 1, bgcolor: "rgba(20,89,142,0.12)", display: "grid", placeItems: "center", color: "rgba(20,89,142,1)", fontWeight: 800 }}>
-                    WO    
-                </Box>
-                <Typography variant="h5" fontWeight={700}>
-                    Work Orders
-                </Typography>
-            </Stack>
-            {isDesktop && (
-                <Stack direction="row" spacing={1}>
-                    <Button variant="outlined" component={NavLink} to="/reports">
-                        PRINT REPORTS
-                    </Button>
-                    <Button variant="outlined" component={NavLink} to="/workorders/create" startIcon={<AddIcon />}>
-                        NEW ORDER
-                    </Button>
+    <Box sx= {{ bgcolor: "rgba(240,243,246,1)", minHeight: "100vh", pt: 0, px: 3, pb: 3  }}>
+        <AppBar position="fixed" elevation={0} sx={{ top: 64, left: drawerWidth, width: `calc(100% -  ${drawerWidth}px)`, bgcolor: "rgba(240,243,246,1)", color: "inherit" }}>
+            <Toolbar disableGutters sx={{ px: 3, justifyContent: "space-between"}}>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Box sx={{ width: 34, height: 34, borderRadius: 1, bgcolor: "rgba(20,89,142,0.12)", display: "grid", placeItems: "center", color: "rgba(20,89,142,1)", fontWeight: 800 }}>
+                        WO    
+                    </Box>
+                    <Typography variant="h5" fontWeight={700}>
+                        Work Orders
+                    </Typography>
                 </Stack>
-            )}
-        </Box>
+                {isDesktop && (
+                    <Stack direction="row" spacing={1}>
+                        <Button variant="outlined" component={NavLink} to="/reports">
+                            PRINT REPORTS
+                        </Button>
+                        <Button variant="outlined" component={NavLink} to="/workorders/create" startIcon={<AddIcon />}>
+                            NEW ORDER
+                        </Button>
+                    </Stack>
+                )}
+            </Toolbar>
+        </AppBar>                
         {/* Mobile Filter Bar */}
         {!isDesktop && (
             <AppBar position="sticky" elevation={0} sx={{ bgcolor: "transparent", mb: 2 }}>
-                <Toolbar disableGutters sx={{ px: 0, pb: 1}}>
+                <Toolbar sx={{ px: 0, pb: 1}}>
                     <ButtonGroup fullWidth variant="outlined">
                         <Button onClick={() => setListView("open")} disabled={listView === "open"}>
                             OPEN
@@ -112,151 +123,205 @@ return (
         )}
 
         {/* Desktop Heading Row & Fixed Sidebar */}
-        {isDesktop && (
-            <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid size={{ xs: 12, lg: 8 }} sx={{ pt: 0, pb: 0}}>
-                    <Toolbar disableGutters sx={{ px: 0, display: "flex", alignItems: "center", justifyContent: "space-between"}}>
-                        <Typography variant="h4" fontWeight={500}>
-                            {headingText}
+        
+        {/* Main Content (DESKTOP = 2/3 + 1/3, MOBILE = full width) */}
+        <Grid
+            container
+            spacing={2}
+            sx={{
+                mt: 0,
+                // push content below the fixed Work Orders bar (your page AppBar is 64px tall)
+                pt: 0,                
+            }}
+        >
+        {/* LEFT: Status bar + Cards (2/3 on desktop) */}
+        <Grid size={{ xs: 12, lg: 8 }} sx={{ minWidth: 0, pt: 0 }}>
+            {/* Sticky Status/Filter Bar (aligned to card column) */}
+            {isDesktop && (
+            <Box
+                sx={{
+                position: "sticky",
+                top: FIXED_TOP, // sits under global topbar + WorkOrders page bar
+                zIndex: (t) => t.zIndex.drawer + 2,
+                bgcolor: "rgba(240,243,246,1)",
+                mx: -1,
+                px: 1,
+                overflow: "hidden"                               
+                }}
+            >
+                <Box
+                sx={{
+                    height: STATUSBAR_H,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                }}
+                >
+                <Typography variant="h4" fontWeight={500} sx={{ textTransform: "capitalize" }}>
+                    {headingText}
+                </Typography>
+
+                <ButtonGroup variant="outlined">
+                    <Button onClick={() => setListView("open")} disabled={listView === "open"}>
+                    OPEN
+                    </Button>
+                    <Button onClick={() => setListView("completed")} disabled={listView === "completed"}>
+                    COMPLETED
+                    </Button>
+                    <Button onClick={() => setListView("held")} disabled={listView === "held"}>
+                    HELD
+                    </Button>
+                </ButtonGroup>
+                </Box>
+            </Box>
+            )}
+
+            {/* Cards */}
+            {loading && <Typography>Loading...</Typography>}
+            {err && <Typography color="error">{String(err).toUpperCase()}</Typography>}
+            {!loading && !err && activeOrders.length === 0 && <Typography>NO WORK ORDERS FOUND</Typography>}
+
+            {!loading && !err && activeOrders.length > 0 && (
+            <Box
+                sx={{
+                display: "grid",
+                gap: 2,
+                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                // IMPORTANT: remove pr/pt hacks; sticky bar now occupies space naturally
+                }}
+            >
+                {activeOrders.map((wo) => {
+                const account = wo.accountName || wo.account || wo.storeName || "UNTITLED ACCOUNT";
+                const woNum = wo.workorderNumber || wo.id;
+                const due = wo.dueDate ? formatMaybeTimestamp(wo.dueDate) : "";
+                const createdOn = wo.createdAt ? formatMaybeTimestamp(wo.createdAt) : "";
+                const createdBy = wo.requestedBy || "N/A";
+                const assignedTo = wo.assignedToName || "N/A";
+                const woType = wo.orderType || wo.type || "N/A";
+
+                return (
+                    <Card
+                    component={Link}
+                    key={wo.id}
+                    to={`/workorders/${wo.id}`}
+                    state={{ backgroundLocation: location }}
+                    sx={{
+                        textDecoration: "none",
+                        color: "inherit",
+                        borderRadius: 2,
+                        overflow: "hidden",
+                        "&:hover": { boxShadow: 4 },
+                    }}
+                    >
+                    <Box sx={{ bgcolor: "rgba(229,239,247,1)", px: 2, py: 1, display: "flex", justifyContent: "space-between" }}>
+                        <Typography fontWeight={600}>#{String(woNum).toUpperCase()}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                        {due ? String(due).toUpperCase() : ""}
                         </Typography>
-                        <ButtonGroup variant="outlined">
-                            <Button onClick={() => setListView("open")} disabled={listView === "open"}>
-                            OPEN
-                            </Button>
-                            <Button onClick={() => setListView("completed")} disabled={listView === "completed"}>
-                                COMPLETED
-                            </Button>
-                            <Button onClick={() => setListView("held")} disabled={listView === "held"}>
-                                HELD
-                            </Button>
-                        </ButtonGroup>
-                    </Toolbar>
-                </Grid>
-                {/* Fixed Sidebar */}
-                <Grid size={{ xs: 12, lg: 4 }} sx={{ pt: 0, pb:0}}>
-                    <Box sx={{ position: "sticky", top: 88 }}>
-                        <Stack spacing={2}>
-                            <Box sx={{ bgcolor: "#fff", borderRadius: 2, p: 2, boxShadow: 1}}>
-                                <Typography variant="h5" sx={{ mb: 2 }}>
-                                    Totals
-                                </Typography>
-                                <Grid container spacing={2}>
-                                    <Grid size={{ xs: 4}}>
-                                        <Typography variant="h3" fontWeight={300}>
-                                            {openOrders.length}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Open Orders
-                                        </Typography>
-                                    </Grid>
-                                    <Grid size={{ xs: 4}}>
-                                        <Typography variant="h3" fontWeight={300}>
-                                            {completedOrders.length}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Completed Orders
-                                        </Typography>
-                                    </Grid>
-                                    <Grid size={{ xs: 4}}>
-                                        <Typography variant="h3" fontWeight={300}>
-                                            {heldOrders.length}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Held Orders
-                                        </Typography>
-                                    </Grid>
-                                </Grid>
-                            </Box>
-
-                            <Divider />
-
-                            {/* Notifications */}
-                            <Box sx={{ bgcolor: "#fff", borderRadius: 2, p: 2, boxShadow: 1 }}>
-                                <Typography variant="h5" sx={{ mb: 1 }}>
-                                    Notifications
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    COMING SOON
-                                </Typography>
-                            </Box>
-                        </Stack>
                     </Box>
-                </Grid>
+
+                    <CardContent>
+                        <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
+                        {account}
+                        </Typography>
+
+                        <Stack spacing={0.5} sx={{ mb: 1.5 }}>
+                        <Typography variant="body2" color="text.secondary">
+                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
+                            WO TYPE:
+                            </Box>
+                            {woType}
+                        </Typography>
+
+                        <Typography variant="body2" color="text.secondary">
+                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
+                            CREATED BY:
+                            </Box>
+                            {createdBy}
+                        </Typography>
+
+                        <Typography variant="body2" color="text.secondary">
+                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
+                            CREATED ON:
+                            </Box>
+                            {createdOn || "N/A"}
+                        </Typography>
+
+                        <Typography variant="body2" color="text.secondary">
+                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
+                            ASSIGNED TO:
+                            </Box>
+                            {assignedTo}
+                        </Typography>
+                        </Stack>
+
+                        <Divider sx={{ mb: 1.5 }} />
+
+                        <Chip label={String(wo.status || "OPEN").toUpperCase()} size="small" sx={{ borderRadius: 1, fontWeight: 700 }} />
+                    </CardContent>
+                    </Card>
+                );
+                })}
+            </Box>
+            )}
+        </Grid>
+
+        {/* RIGHT: Sidebar (1/3 on desktop) */}
+        {isDesktop && (
+            <Grid size={{ xs: 12, lg: 4 }} sx={{ minWidth: 0, pt: 0 }}>
+            <Box sx={{ position: "sticky", top: FIXED_TOP, bgcolor: "rgba(240,243,246,1)" }}>
+                <Stack spacing={2}>
+                    <Box sx={{ height: STATUSBAR_H, display: "flex", alignItems: "center"}}>
+                        <Typography variant="h4" fontWeight={500}>
+                            Totals
+                        </Typography>
+                    </Box>
+
+                {/* Totals (flat, aligned with button group top) */}
+                <Box sx={{ pb: 2, borderBottom: "1px solid rgba(0,0,0,0.12)" }}>
+                    <Grid container spacing={2}>
+                    <Grid size={{ xs: 4 }}>
+                        <Typography variant="h1" fontWeight={300}>
+                        {openOrders.length}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                        Open Orders
+                        </Typography>
+                    </Grid>
+
+                    <Grid size={{ xs: 4 }}>
+                        <Typography variant="h1" fontWeight={300}>
+                        {completedOrders.length}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                        Completed This Week
+                        </Typography>
+                    </Grid>
+
+                    <Grid size={{ xs: 4 }}>
+                        <Typography variant="h1" fontWeight={300}>
+                        {heldOrders.length}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                        Held Orders
+                        </Typography>
+                    </Grid>
+                    </Grid>
+                </Box>
+
+                {/* Notifications (flat) */}
+                <Box sx={{ pt: 1 }}>
+                    <Typography variant="h4" fontWeight={500} sx={{ mb: 1 }}>
+                    Notifications
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                    COMING SOON
+                    </Typography>
+                </Box>
+                </Stack>
+            </Box>
             </Grid>
         )}
-
-        {/* Main Content */}
-        <Grid container spacing={2} sx={{ mt: 0 }}>
-            <Grid size={{ xs: 12, lg: 8}}>
-                {loading && <Typography>Loading...</Typography>}
-                {err && <Typography color="error">{String(err).toUpperCase()}</Typography>}
-                {!loading && !err && activeOrders.length === 0 && (
-                    <Typography>NO WORK ORDERS FOUND</Typography>
-                )}
-                {!loading && !err && activeOrders.length > 0 && (
-                    <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
-                        {activeOrders.map((wo) => {
-                            const account = wo.accountName || wo.account || wo.storeName || "UNTITLED ACCOUNT";
-                            const woNum = wo.workorderNumber || wo.id;
-                            const due = wo.dueDate ? formatMaybeTimestamp(wo.dueDate) : ""
-                            const createdOn = wo.createdAt ? formatMaybeTimestamp(wo.createdAt) : "";
-                            const createdBy = wo.requestedBy || "N/A";
-                            const assignedTo = wo.assignedToName || "N/A";
-                            const woType = wo.orderType || wo.type || "N/A";                            
-
-                            return (
-                                <Card component={Link} key={wo.id} to={`/workorders/${wo.id}`} state={{ backgroundLocation: location}} sx={{ textDecoration: "none", color: "inherit", borderRadius: 2,
-                                    overflow: "hidden", "&:hover": { boxShadow: 4}
-                                }}>
-                                    <Box sx={{ bgcolor: "rgba(229,239,247,1)", px: 2, py: 1, display: "flex", justifyContent: "space-between" }}>
-                                        <Typography fontWeight={600}>#{String(woNum).toUpperCase()}</Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            {due ? String(due).toUpperCase() : ""}
-                                        </Typography>
-                                    </Box>
-                                    <CardContent>
-                                        <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
-                                            {account}
-                                        </Typography>
-                                        <Stack spacing={0.5} sx={{ mb: 1.5 }}>
-                                            <Typography variant="body2" color="text.secondary">
-                                                <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
-                                                    WO TYPE:
-                                                </Box>
-                                                {woType}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
-                                                    CREATED BY:
-                                                </Box>
-                                                {createdBy}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
-                                                    CREATED ON:
-                                                </Box>
-                                                {createdOn || "N/A"}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
-                                                    ASSIGNED TO:
-                                                </Box>
-                                                {assignedTo}
-                                            </Typography>
-                                        </Stack>
-
-                                        <Divider sx={{ mb: 1.5 }}/>
-
-                                        <Chip label={String(wo.status || "OPEN").toUpperCase()} size="small" sx={{ borderRadius: 1, fontWeight: 700 }}/>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
-                    </Box>
-                )}
-            </Grid>
-            {/* spacer column for fixed sidebar */}
-            <Grid size={{ xs: 12, lg: 4 }}/>
         </Grid>
         {/* Mobile FAB */}
         {!isDesktop && (
