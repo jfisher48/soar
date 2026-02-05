@@ -1,42 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useOutletContext, useLocation } from "react-router-dom";
 import { Box, Button, Dialog, DialogActions, DialogTitle, DialogContent, IconButton, Typography, Stack, Chip, Divider, Grid } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { fetchWorkOrderById } from "../services/workOrders";
+import { fetchWorkOrderById, updateWorkOrderStatus } from "../services/workOrders";
 import ShelfStripsBody from "./shelfstrips/ShelfStripsBody";
-
-function formatMaybeTimestamp(v) {
-  try {
-    if (v?.toDate) return v.toDate().toLocaleString();
-    if (typeof v?.seconds === "number") return new Date(v.seconds * 1000).toLocaleString();
-    if (v instanceof Date) return v.toLocaleString();
-    if (typeof v === "number") return new Date(v).toLocaleString();
-    if (typeof v === "string") {
-      const d = new Date(v);
-      return isNaN(d.getTime()) ? v : d.toLocaleString();
-    }
-    return "";
-  } catch {
-    return "";
-  }
-}
-
-function formatShortDate(v) {
-  try {
-    if (v?.toDate) v = v.toDate();
-    if (typeof v?.seconds === "number") v = new Date(v.seconds * 1000);
-    if (typeof v === "string") v = new Date(v);
-    if (!(v instanceof Date) || isNaN(v)) return "—";
-
-    return v.toLocaleDateString("en-US", {
-      month: "short",
-      day: "2-digit",
-      year: "2-digit",
-    }).replace(",", "");
-  } catch {
-    return "—";
-  }
-}
+import { formatMaybeTimestamp, formatShortDate } from "../lib/dates";
 
 function statusChipProps(status) {
   const s = String(status || "").toLowerCase();
@@ -52,36 +20,111 @@ function money(v) {
   return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
 }
 
-
-
 export default function WorkOrderDetailModal() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { orders = [], updateWorkOrderInList } = useOutletContext() || {}; 
     const [wo, setWo] = useState(null);
+    const location = useLocation();
+    const backgroundLocation = location.state?.backgroundLocation;
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState("");
-    const handleClose = () => navigate("..");
+    const [saving, setSaving] = useState(false);
+
+    const handleClose = () => {
+        if (backgroundLocation) {
+            navigate(-1);
+        } else {
+            navigate("/workorders");
+        }
+        };
+    
+    const participants = useMemo(() => {
+    // start with whatever is already on the workorder, if present
+    const base = Array.isArray(wo?.participants) ? wo.participants : [];
+
+    // add the key “people involved” fields you already store
+    const add = [
+        wo?.requesterId,
+        wo?.assignedTo,
+    ];
+
+    return Array.from(new Set([...base, ...add].filter(Boolean).map(String)));
+    }, [wo?.participants, wo?.requesterId, wo?.assignedTo]);
+
+    const applyPatchLocal = (patch) => {
+        setWo((prev) => (prev ? { ...prev, ...patch }: prev));
+        if (id) updateWorkOrderInList?.({ id, ...patch });
+    };  
+
+    const applyStatus = async (nextStatus) => {
+        if (!id || !wo) return;
+
+        setSaving(true);
+        setErr("");
+
+        const touchedAt = new Date();
+
+        //TODO (later): use authenticated user for touchedBy
+        const touchedBy = wo?.assignedToName || wo?.requestedBy || wo?.touchedBy || "";
+
+        // Build ONE patch and reuse it
+        const patch = {
+            status: nextStatus,
+            touchedAt,
+            touchedBy,
+            participants, //memoized array
+        };
+
+        try {
+            await updateWorkOrderStatus(id, nextStatus, touchedBy, participants);
+
+            applyPatchLocal(patch);
+
+        } catch (e) {
+            setErr(e?.message || "Failed to update work order.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const fromList = useMemo(() => {
+        if (!id) return null;
+        return orders.find((o) => o.id === id) || null;
+        }, [orders, id]);
 
     useEffect(() => {
         let cancelled = false;
 
         (async () => {
-            setLoading(true);
             setErr("");
-            try{
-                const data = await fetchWorkOrderById(id);
-                if (!cancelled) setWo(data);
+
+            // 1) Use list cache if available (NO loading flicker)
+            if (fromList) {
+            setWo(fromList);
+            setLoading(false);
+            return;
+            }
+
+            // 2) Deep link / not in list
+            setLoading(true);
+            setWo(null);
+
+            try {
+            const data = await fetchWorkOrderById(id);
+            if (!cancelled) setWo(data);
             } catch (e) {
-                if (!cancelled) setErr(e?.message || "Failed to load work order")
+            if (!cancelled) setErr(e?.message || "Failed to load work order");
             } finally {
-                if (!cancelled) setLoading(false);
+            if (!cancelled) setLoading(false);
             }
         })();
 
         return () => {
             cancelled = true;
         };
-    }, [id]);
+        }, [id, fromList]);
+
 
     const headerId = wo?.workorderNumber || wo?.id || id;
     const headerDate = wo?.dueDate ? formatMaybeTimestamp(wo.dueDate) : "";
@@ -97,9 +140,10 @@ export default function WorkOrderDetailModal() {
     }, [wo, items.length]);
 
     const isShelfStrips = String(wo?.orderType || "").toLowerCase() === "shelf strips";
+    const status = String(wo?.status || "open").toLowerCase(); 
 
     return (
-        <Dialog open onClose={handleClose} fullWidth maxWidth="lg">
+        <Dialog open={!!id} onClose={handleClose} fullWidth maxWidth="lg">
             <DialogTitle sx={{ pr: 6, backgroundColor: "rgba(229,239,247,1)", borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
                 <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">                    
                     <Typography variant="h6" fontWeight={700} color="#4e5262">
@@ -221,12 +265,59 @@ export default function WorkOrderDetailModal() {
 
                 <DialogActions sx={{ px:3, py: 2 }}>
                     <Stack direction="row" spacing={1} sx={{ flex: 1 }}>
-                        <Button variant="contained" color="primary" disabled>
-                            COMPLETE
-                        </Button>
-                        <Button variant="outlined" color="warning" disabled>
-                            HOLD
-                        </Button>
+                        {status === "open" && (
+                            <>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    disabled={!wo || saving}
+                                    onClick={() => applyStatus("completed")}
+                                >
+                                    {saving ? "SAVING..." : "COMPLETE"}
+                                </Button>
+
+                                <Button
+                                    variant="outlined"
+                                    color="warning"
+                                    disabled={!wo || saving}
+                                    onClick={() => applyStatus("held")}
+                                >
+                                    {saving ? "SAVING..." : "HOLD"}
+                                </Button>
+                            </>
+                        )}
+
+                        {status === "held" && (
+                            <>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    disabled={!wo || saving}
+                                    onClick={() => applyStatus("completed")}
+                                >
+                                    {saving ? "SAVING..." : "COMPLETE"}
+                                </Button>
+
+                                <Button
+                                    variant="outlined"
+                                    disabled={!wo || saving}
+                                    onClick={() => applyStatus("open")}
+                                >
+                                    REOPEN
+                                </Button>
+                            </>
+                        )}
+
+                        {status === "completed" && (
+                            <Button
+                                variant="outlined"
+                                disabled={!wo || saving}
+                                onClick={() => applyStatus("open")}
+                            >
+                                REOPEN
+                            </Button>
+                        )}
+
                         <Button variant="outlined" disabled>
                             EDIT ORDER
                         </Button>                       

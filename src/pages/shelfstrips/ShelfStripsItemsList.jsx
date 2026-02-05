@@ -24,12 +24,7 @@ export default function ShelfStripsItemsList({items, money}) {
                         )}
                     </Grid>                                         
                 </Grid>
-            ))}
-            {items.length === 0 && (
-                <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5}}>
-                    No Items on this workorder.
-                </Typography>
-            )}
+            ))}            
         </Box>
     );
 }
