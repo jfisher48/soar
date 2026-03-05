@@ -4,6 +4,7 @@ import { AppBar, Box, Button, ButtonGroup, Card, CardContent, Chip, Divider, Fab
 import AddIcon from "@mui/icons-material/Add";
 import { Link, Outlet, useLocation, NavLink } from "react-router-dom";
 import { formatMaybeTimestamp } from "../lib/dates";
+import siteNav from "../app/nav/siteNav";
 
 export default function WorkOrders() {
     const location = useLocation();
@@ -14,15 +15,19 @@ export default function WorkOrders() {
     const [listView, setListView] = useState("open");
 
     const theme = useTheme();
-    const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
+    const isSmDown = useMediaQuery(theme.breakpoints.down("sm"));
+    const isMdUp   = useMediaQuery(theme.breakpoints.up("md"));
+    const isLgUp   = useMediaQuery(theme.breakpoints.up("lg"));
+
+    const navItem =  siteNav.find((i) => i.key === "workorders");
 
     // --- LEGACY-LIKE FIXED CHROME (DESKTOP) ---
-    const TOPBAR_H = 64;        // global app top bar height
+    const TOPBAR_H = isSmDown ? 64 : 0;        // global app top bar height
     const PAGEBAR_H = 64;       // WorkOrders page bar (your AppBar with "Work Orders")
     const STATUSBAR_H = 75;        // status bar height ("Open/Completed/Held" row)
     const FIXED_TOP = TOPBAR_H + PAGEBAR_H; // top position for status bar + sidebar
 
-    const drawerWidth = 220;    
+    const drawerWidth = 270;    
     const GUTTER = 24;
 
     useEffect(() => {
@@ -81,17 +86,39 @@ const headingText =
 
 return (
     <Box sx= {{ bgcolor: "rgba(240,243,246,1)", minHeight: "100vh", pt: 0, px: 3, pb: 3  }}>
-        <AppBar position="fixed" elevation={0} sx={{ top: 64, left: drawerWidth, width: `calc(100% -  ${drawerWidth}px)`, bgcolor: "rgba(240,243,246,1)", color: "inherit" }}>
+        <AppBar position="fixed" elevation={0} sx={{ top: isSmDown ? 64 : 0, left: drawerWidth, width: `calc(100% -  ${drawerWidth}px)`, bgcolor: "rgba(240,243,246,1)", color: "inherit" }}>
             <Toolbar disableGutters sx={{ px: 3, justifyContent: "space-between"}}>
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Box sx={{ width: 34, height: 34, borderRadius: 1, bgcolor: "rgba(20,89,142,0.12)", display: "grid", placeItems: "center", color: "rgba(20,89,142,1)", fontWeight: 800 }}>
-                        WO    
+                    <Box
+                        sx={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 1,
+                            bgcolor: navItem?.hoverBg || "rgba(20,89,142,1)",
+                            display: "grid",
+                            placeItems: "center",
+                            flexShrink: 0
+                        }}
+                    >
+                        <Box
+                            component="svg"
+                            viewBox={navItem?.svgbox}
+                            aria-hidden="true"
+                            sx={{
+                                width: 22,
+                                height: 22,
+                                display: "block",
+                                "& path": { fill: "#fff" }
+                            }}
+                        >
+                            <path d={navItem?.svgpath}/>
+                        </Box>
                     </Box>
                     <Typography variant="h5" fontWeight={700}>
                         Work Orders
                     </Typography>
                 </Stack>
-                {isDesktop && (
+                {isLgUp && (
                     <Stack direction="row" spacing={1}>
                         <Button variant="outlined" component={NavLink} to="/reports">
                             PRINT REPORTS
@@ -104,8 +131,10 @@ return (
             </Toolbar>
         </AppBar>                
         {/* Mobile Filter Bar */}
-        {!isDesktop && (
-            <AppBar position="sticky" elevation={0} sx={{ bgcolor: "transparent", mb: 2 }}>
+        {!isLgUp && (
+            <AppBar position="sticky" elevation={0} sx={{ top: `${TOPBAR_H + PAGEBAR_H}px`, zIndex: (t) => t.zIndex.drawer + 1, bgcolor: "rgba(240,243,246,1)", mb: 2, mx: -1,
+                px: 1,
+                overflow: "hidden" }}>
                 <Toolbar sx={{ px: 0, pb: 1}}>
                     <ButtonGroup fullWidth variant="outlined">
                         <Button onClick={() => setListView("open")} disabled={listView === "open"}>
@@ -131,13 +160,13 @@ return (
             sx={{
                 mt: 0,
                 // push content below the fixed Work Orders bar (your page AppBar is 64px tall)
-                pt: 0,                
+                pt: "64px",                
             }}
         >
         {/* LEFT: Status bar + Cards (2/3 on desktop) */}
         <Grid size={{ xs: 12, lg: 8 }} sx={{ minWidth: 0, pt: 0 }}>
             {/* Sticky Status/Filter Bar (aligned to card column) */}
-            {isDesktop && (
+            {isLgUp && (
             <Box
                 sx={{
                 position: "sticky",
@@ -267,7 +296,7 @@ return (
         </Grid>
 
         {/* RIGHT: Sidebar (1/3 on desktop) */}
-        {isDesktop && (
+        {isLgUp && (
             <Grid size={{ xs: 12, lg: 4 }} sx={{ minWidth: 0, pt: 0 }}>
             <Box sx={{ position: "sticky", top: FIXED_TOP, bgcolor: "rgba(240,243,246,1)" }}>
                 <Stack spacing={2}>
@@ -324,7 +353,7 @@ return (
         )}
         </Grid>
         {/* Mobile FAB */}
-        {!isDesktop && (
+        {!isLgUp && (
             <Fab component={NavLink} to="/workorders/create" color="secondary" sx={{ position: "fixed", right: 16, bottom: 16 }}>
                 <AddIcon />
             </Fab>
