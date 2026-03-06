@@ -207,15 +207,7 @@ export default function AppLayout() {
                 )}
                 <Typography variant="h6" noWrap sx={{ flexGrow: 1}}>
                     Soar
-                </Typography>
-                <Stack direction="row" spacing={2} alignItems="center">
-                    <Typography variant="caption">
-                        {user?.email}
-                    </Typography>
-                    <IconButton color="inherit" onClick={handleLogout}>
-                        Logout
-                    </IconButton>
-                </Stack>
+                </Typography>                
             </Toolbar>
         </AppBar>
         
@@ -262,8 +254,7 @@ export default function AppLayout() {
                 ml: isLgUp ? `${drawerWidth}px` : isMdUp && !isLgUp && drawerOpen ? `${drawerWidth}px` : 0, transition: "margin-left 200ms ease",
                 bgcolor: "rgba(240,243,246,1)" 
             }}
-        >
-            {isLgUp && <Toolbar />}
+        >            
             <Outlet />
         </Box>
         <Menu

@@ -21,14 +21,15 @@ export default function WorkOrders() {
 
     const navItem =  siteNav.find((i) => i.key === "workorders");
 
-    // --- LEGACY-LIKE FIXED CHROME (DESKTOP) ---
-    const TOPBAR_H = isSmDown ? 64 : 0;        // global app top bar height
-    const PAGEBAR_H = 64;       // WorkOrders page bar (your AppBar with "Work Orders")
-    const STATUSBAR_H = 75;        // status bar height ("Open/Completed/Held" row)
-    const FIXED_TOP = TOPBAR_H + PAGEBAR_H; // top position for status bar + sidebar
+    // --- LAYOUT OFFSETS ---
+const PAGE_HEADER_H = 64;
+const MOBILE_FILTER_H = 64;
+const STATUSBAR_H = 75;
+const FIXED_TOP = PAGE_HEADER_H;
 
-    const drawerWidth = 270;    
-    const GUTTER = 24;
+const LIST_TOP_PADDING = isLgUp ? PAGE_HEADER_H : PAGE_HEADER_H + MOBILE_FILTER_H + 56;
+
+const drawerWidth = 270;
 
     useEffect(() => {
         let cancelled = false;
@@ -86,7 +87,7 @@ const headingText =
 
 return (
     <Box sx= {{ bgcolor: "rgba(240,243,246,1)", minHeight: "100vh", pt: 0, px: 3, pb: 3  }}>
-        <AppBar position="fixed" elevation={0} sx={{ top: isSmDown ? 64 : 0, left: drawerWidth, width: `calc(100% -  ${drawerWidth}px)`, bgcolor: "rgba(240,243,246,1)", color: "inherit" }}>
+        <AppBar position="fixed" elevation={0} sx={{ top: isLgUp ? 0 : 64, left: isLgUp ? drawerWidth : 0, width: isLgUp ? `calc(100% -  ${drawerWidth}px)` : "100%", bgcolor: "rgba(240,243,246,1)", color: "inherit" }}>
             <Toolbar disableGutters sx={{ px: 3, justifyContent: "space-between"}}>
                 <Stack direction="row" spacing={1.5} alignItems="center">
                     <Box
@@ -129,28 +130,22 @@ return (
                     </Stack>
                 )}
             </Toolbar>
-        </AppBar>                
-        {/* Mobile Filter Bar */}
-        {!isLgUp && (
-            <AppBar position="sticky" elevation={0} sx={{ top: `${TOPBAR_H + PAGEBAR_H}px`, zIndex: (t) => t.zIndex.drawer + 1, bgcolor: "rgba(240,243,246,1)", mb: 2, mx: -1,
-                px: 1,
-                overflow: "hidden" }}>
-                <Toolbar sx={{ px: 0, pb: 1}}>
-                    <ButtonGroup fullWidth variant="outlined">
-                        <Button onClick={() => setListView("open")} disabled={listView === "open"}>
+            {!isLgUp && (
+                <Box sx={{ px: 3, pb: 3 }}>                    
+                    <ButtonGroup fullWidth sx={{ display: "flex", width: "100%" }}>
+                        <Button onClick={() => setListView("open")} variant={listView === "open" ? "contained" : "outlined"} color="primary">
                             OPEN
                         </Button>
-                        <Button onClick={() => setListView("completed")} disabled={listView === "completed"}>
+                        <Button onClick={() => setListView("completed")} variant={listView === "completed" ? "contained" : "outlined"}>
                             COMPLETED
                         </Button>
-                        <Button onClick={() => setListView("held")} disabled={listView === "held"}>
+                        <Button onClick={() => setListView("held")} variant={listView === "held" ? "contained" : "outlined"}>
                             HELD
                         </Button>
-                    </ButtonGroup>
-                </Toolbar>
-            </AppBar>
-        )}
-
+                    </ButtonGroup>                    
+                </Box>
+            )}
+        </AppBar>        
         {/* Desktop Heading Row & Fixed Sidebar */}
         
         {/* Main Content (DESKTOP = 2/3 + 1/3, MOBILE = full width) */}
@@ -160,7 +155,7 @@ return (
             sx={{
                 mt: 0,
                 // push content below the fixed Work Orders bar (your page AppBar is 64px tall)
-                pt: "64px",                
+                pt: `${LIST_TOP_PADDING}px`                
             }}
         >
         {/* LEFT: Status bar + Cards (2/3 on desktop) */}
@@ -215,8 +210,7 @@ return (
                 sx={{
                 display: "grid",
                 gap: 2,
-                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-                // IMPORTANT: remove pr/pt hacks; sticky bar now occupies space naturally
+                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },                
                 }}
             >
                 {activeOrders.map((wo) => {
