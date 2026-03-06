@@ -192,9 +192,9 @@ export default function AppLayout() {
     return(
         
        <Box sx={{ display: "flex", bgcolor: "rgba(240,243,246,1)" }}>        
-        <AppBar position="fixed" sx={{ display: { xs: "flex", md: "none" }, zIndex: (t) => t.zIndex.drawer + 1}}>
+        <AppBar position="fixed" sx={{ display: { xs: "flex", lg: "none" }, zIndex: (t) => t.zIndex.drawer + 1}}>
             <Toolbar>
-                {!isMdUp && (
+                {!isLgUp && (
                     <IconButton
                         color="inherit"
                         edge="start"
@@ -263,7 +263,7 @@ export default function AppLayout() {
                 bgcolor: "rgba(240,243,246,1)" 
             }}
         >
-            {isSmDown &&<Toolbar />}
+            {isLgUp && <Toolbar />}
             <Outlet />
         </Box>
         <Menu
