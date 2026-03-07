@@ -5,6 +5,7 @@ import AddIcon from "@mui/icons-material/Add";
 import { Link, Outlet, useLocation, NavLink } from "react-router-dom";
 import { formatMaybeTimestamp } from "../lib/dates";
 import siteNav from "../app/nav/siteNav";
+import WorkOrderFilterGroup from "../components/workorders/WorkOrderFilterGroup";
 
 export default function WorkOrders() {
     const location = useLocation();
@@ -12,24 +13,22 @@ export default function WorkOrders() {
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState("");
 
-    const [listView, setListView] = useState("open");
+    const [listView, setListView] = useState("open");    
 
-    const theme = useTheme();
-    const isSmDown = useMediaQuery(theme.breakpoints.down("sm"));
-    const isMdUp   = useMediaQuery(theme.breakpoints.up("md"));
-    const isLgUp   = useMediaQuery(theme.breakpoints.up("lg"));
+    const theme = useTheme();    
+    const isDesktop   = useMediaQuery(theme.breakpoints.up("lg"));
 
     const navItem =  siteNav.find((i) => i.key === "workorders");
 
     // --- LAYOUT OFFSETS ---
-const PAGE_HEADER_H = 64;
-const MOBILE_FILTER_H = 64;
-const STATUSBAR_H = 75;
-const FIXED_TOP = PAGE_HEADER_H;
+    const PAGE_HEADER_H = 64;
+    const MOBILE_FILTER_H = 64;
+    const STATUSBAR_H = 75;
+    const FIXED_TOP = PAGE_HEADER_H;
 
-const LIST_TOP_PADDING = isLgUp ? PAGE_HEADER_H : PAGE_HEADER_H + MOBILE_FILTER_H + 56;
+    const LIST_TOP_PADDING = isDesktop ? PAGE_HEADER_H : PAGE_HEADER_H + MOBILE_FILTER_H + 56;
 
-const drawerWidth = 270;
+    const drawerWidth = 270;
 
     useEffect(() => {
         let cancelled = false;
@@ -87,7 +86,7 @@ const headingText =
 
 return (
     <Box sx= {{ bgcolor: "rgba(240,243,246,1)", minHeight: "100vh", pt: 0, px: 3, pb: 3  }}>
-        <AppBar position="fixed" elevation={0} sx={{ top: isLgUp ? 0 : 64, left: isLgUp ? drawerWidth : 0, width: isLgUp ? `calc(100% -  ${drawerWidth}px)` : "100%", bgcolor: "rgba(240,243,246,1)", color: "inherit" }}>
+        <AppBar position="fixed" elevation={0} sx={{ top: isDesktop ? 0 : 64, left: isDesktop ? drawerWidth : 0, width: isDesktop ? `calc(100% - ${drawerWidth}px)` : "100%", bgcolor: "rgba(240,243,246,1)", color: "inherit" }}>
             <Toolbar disableGutters sx={{ px: 3, justifyContent: "space-between"}}>
                 <Stack direction="row" spacing={1.5} alignItems="center">
                     <Box
@@ -119,7 +118,7 @@ return (
                         Work Orders
                     </Typography>
                 </Stack>
-                {isLgUp && (
+                {isDesktop && (
                     <Stack direction="row" spacing={1}>
                         <Button variant="outlined" component={NavLink} to="/reports">
                             PRINT REPORTS
@@ -130,19 +129,13 @@ return (
                     </Stack>
                 )}
             </Toolbar>
-            {!isLgUp && (
-                <Box sx={{ px: 3, pb: 3 }}>                    
-                    <ButtonGroup fullWidth sx={{ display: "flex", width: "100%" }}>
-                        <Button onClick={() => setListView("open")} variant={listView === "open" ? "contained" : "outlined"} color="primary">
-                            OPEN
-                        </Button>
-                        <Button onClick={() => setListView("completed")} variant={listView === "completed" ? "contained" : "outlined"}>
-                            COMPLETED
-                        </Button>
-                        <Button onClick={() => setListView("held")} variant={listView === "held" ? "contained" : "outlined"}>
-                            HELD
-                        </Button>
-                    </ButtonGroup>                    
+            {!isDesktop && (
+                <Box sx={{ px: 3, pb: 3}}>
+                    <WorkOrderFilterGroup
+                        listView={listView}
+                        onChange={setListView}
+                        fullWidth
+                    />
                 </Box>
             )}
         </AppBar>        
@@ -161,11 +154,11 @@ return (
         {/* LEFT: Status bar + Cards (2/3 on desktop) */}
         <Grid size={{ xs: 12, lg: 8 }} sx={{ minWidth: 0, pt: 0 }}>
             {/* Sticky Status/Filter Bar (aligned to card column) */}
-            {isLgUp && (
+            {isDesktop && (
             <Box
                 sx={{
                 position: "sticky",
-                top: FIXED_TOP, // sits under global topbar + WorkOrders page bar
+                top: FIXED_TOP, 
                 zIndex: (t) => t.zIndex.drawer + 2,
                 bgcolor: "rgba(240,243,246,1)",
                 mx: -1,
@@ -174,28 +167,20 @@ return (
                 }}
             >
                 <Box
-                sx={{
-                    height: STATUSBAR_H,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                }}
+                    sx={{
+                        height: STATUSBAR_H,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                    }}
                 >
-                <Typography variant="h4" fontWeight={500} sx={{ textTransform: "capitalize" }}>
-                    {headingText}
-                </Typography>
-
-                <ButtonGroup variant="outlined">
-                    <Button onClick={() => setListView("open")} disabled={listView === "open"}>
-                    OPEN
-                    </Button>
-                    <Button onClick={() => setListView("completed")} disabled={listView === "completed"}>
-                    COMPLETED
-                    </Button>
-                    <Button onClick={() => setListView("held")} disabled={listView === "held"}>
-                    HELD
-                    </Button>
-                </ButtonGroup>
+                    <Typography variant="h4" fontWeight={500} sx={{ textTransform: "capitalize" }}>
+                        {headingText}
+                    </Typography>
+                    <WorkOrderFilterGroup
+                        listView={listView}
+                        onChange={setListView}
+                    />                    
                 </Box>
             </Box>
             )}
@@ -205,92 +190,104 @@ return (
             {err && <Typography color="error">{String(err).toUpperCase()}</Typography>}
             {!loading && !err && activeOrders.length === 0 && <Typography>NO WORK ORDERS FOUND</Typography>}
 
-            {!loading && !err && activeOrders.length > 0 && (
-            <Box
-                sx={{
-                display: "grid",
-                gap: 2,
-                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },                
-                }}
-            >
-                {activeOrders.map((wo) => {
-                const account = wo.accountName || wo.account || wo.storeName || "UNTITLED ACCOUNT";
-                const woNum = wo.workorderNumber || wo.id;
-                const due = wo.dueDate ? formatMaybeTimestamp(wo.dueDate) : "";
-                const createdOn = wo.createdAt ? formatMaybeTimestamp(wo.createdAt) : "";
-                const createdBy = wo.requestedBy || "N/A";
-                const assignedTo = wo.assignedToName || "N/A";
-                const woType = wo.orderType || wo.type || "N/A";
-
-                return (
-                    <Card
-                    component={Link}
-                    key={wo.id}
-                    to={`/workorders/${wo.id}`}
-                    state={{ backgroundLocation: location }}
+            {!loading && !err && activeOrders.length > 0 && (            
+                <Box
+                    key={listView}
                     sx={{
-                        textDecoration: "none",
-                        color: "inherit",
-                        borderRadius: 2,
-                        overflow: "hidden",
-                        "&:hover": { boxShadow: 4 },
+                    display: "grid",
+                    gap: 2,
+                    gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                    animation: "workOrderFade 440ms ease",
+                    "@keyframes workOrderFade": {
+                        from: {
+                            opacity: 0,
+                            transform: "translateY(6px)"
+                        },
+                        to: {
+                            opacity: 1,
+                            transform: "translateY(0)"
+                        }
+                    }                
                     }}
-                    >
-                    <Box sx={{ bgcolor: "rgba(229,239,247,1)", px: 2, py: 1, display: "flex", justifyContent: "space-between" }}>
-                        <Typography fontWeight={600}>#{String(woNum).toUpperCase()}</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                        {due ? String(due).toUpperCase() : ""}
-                        </Typography>
-                    </Box>
+                >
+                    {activeOrders.map((wo) => {
+                    const account = wo.accountName || wo.account || wo.storeName || "UNTITLED ACCOUNT";
+                    const woNum = wo.workorderNumber || wo.id;
+                    const due = wo.dueDate ? formatMaybeTimestamp(wo.dueDate) : "";
+                    const createdOn = wo.createdAt ? formatMaybeTimestamp(wo.createdAt) : "";
+                    const createdBy = wo.requestedBy || "N/A";
+                    const assignedTo = wo.assignedToName || "N/A";
+                    const woType = wo.orderType || wo.type || "N/A";
 
-                    <CardContent>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
-                        {account}
-                        </Typography>
+                    return (
+                        <Card
+                        component={Link}
+                        key={wo.id}
+                        to={`/workorders/${wo.id}`}
+                        state={{ backgroundLocation: location }}
+                        sx={{
+                            textDecoration: "none",
+                            color: "inherit",
+                            borderRadius: 2,
+                            overflow: "hidden",
+                            "&:hover": { boxShadow: 4 },
+                        }}
+                        >
+                        <Box sx={{ bgcolor: "rgba(229,239,247,1)", px: 2, py: 1, display: "flex", justifyContent: "space-between" }}>
+                            <Typography fontWeight={600}>#{String(woNum).toUpperCase()}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                            {due ? String(due).toUpperCase() : ""}
+                            </Typography>
+                        </Box>
 
-                        <Stack spacing={0.5} sx={{ mb: 1.5 }}>
-                        <Typography variant="body2" color="text.secondary">
-                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
-                            WO TYPE:
-                            </Box>
-                            {woType}
-                        </Typography>
+                        <CardContent>
+                            <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
+                            {account}
+                            </Typography>
 
-                        <Typography variant="body2" color="text.secondary">
-                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
-                            CREATED BY:
-                            </Box>
-                            {createdBy}
-                        </Typography>
+                            <Stack spacing={0.5} sx={{ mb: 1.5 }}>
+                            <Typography variant="body2" color="text.secondary">
+                                <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
+                                WO TYPE:
+                                </Box>
+                                {woType}
+                            </Typography>
 
-                        <Typography variant="body2" color="text.secondary">
-                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
-                            CREATED ON:
-                            </Box>
-                            {createdOn || "N/A"}
-                        </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
+                                CREATED BY:
+                                </Box>
+                                {createdBy}
+                            </Typography>
 
-                        <Typography variant="body2" color="text.secondary">
-                            <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
-                            ASSIGNED TO:
-                            </Box>
-                            {assignedTo}
-                        </Typography>
-                        </Stack>
+                            <Typography variant="body2" color="text.secondary">
+                                <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
+                                CREATED ON:
+                                </Box>
+                                {createdOn || "N/A"}
+                            </Typography>
 
-                        <Divider sx={{ mb: 1.5 }} />
+                            <Typography variant="body2" color="text.secondary">
+                                <Box component="span" sx={{ color: "rgba(0,0,0,0.54)", mr: 1 }}>
+                                ASSIGNED TO:
+                                </Box>
+                                {assignedTo}
+                            </Typography>
+                            </Stack>
 
-                        <Chip label={String(wo.status || "OPEN").toUpperCase()} size="small" sx={{ borderRadius: 1, fontWeight: 700 }} />
-                    </CardContent>
-                    </Card>
-                );
-                })}
-            </Box>
+                            <Divider sx={{ mb: 1.5 }} />
+
+                            <Chip label={String(wo.status || "OPEN").toUpperCase()} size="small" sx={{ borderRadius: 1, fontWeight: 700 }} />
+                        </CardContent>
+                        </Card>
+                    );
+                    })}
+                </Box>            
             )}
         </Grid>
 
         {/* RIGHT: Sidebar (1/3 on desktop) */}
-        {isLgUp && (
+        {isDesktop && (
             <Grid size={{ xs: 12, lg: 4 }} sx={{ minWidth: 0, pt: 0 }}>
             <Box sx={{ position: "sticky", top: FIXED_TOP, bgcolor: "rgba(240,243,246,1)" }}>
                 <Stack spacing={2}>
@@ -304,33 +301,69 @@ return (
                 <Box sx={{ pb: 2, borderBottom: "1px solid rgba(0,0,0,0.12)" }}>
                     <Grid container spacing={2}>
                     <Grid size={{ xs: 4 }}>
-                        <Typography variant="h1" fontWeight={300}>
-                        {openOrders.length}
+                        <Typography
+                            variant="h1"
+                            fontWeight={300}
+                            onClick={() => setListView("open")}
+                            sx={{
+                                cursor: "pointer",
+                                userSelect: "none",
+                                "&:hover": {
+                                    color: "#0091EA"
+                                }
+                            }}
+                        >
+                            {openOrders.length}
                         </Typography>
+
                         <Typography variant="caption" color="text.secondary">
-                        Open Orders
+                            Open Orders
                         </Typography>
                     </Grid>
 
                     <Grid size={{ xs: 4 }}>
-                        <Typography variant="h1" fontWeight={300}>
-                        {completedOrders.length}
+                        <Typography
+                            variant="h1"
+                            fontWeight={300}
+                            onClick={() => setListView("completed")}
+                            sx={{
+                                cursor: "pointer",
+                                userSelect: "none",
+                                "&:hover": {
+                                    color: "#0091EA"
+                                }
+                            }}
+                        >
+                            {completedOrders.length}
                         </Typography>
+
                         <Typography variant="caption" color="text.secondary">
-                        Completed This Week
+                            Completed This Week
                         </Typography>
                     </Grid>
 
                     <Grid size={{ xs: 4 }}>
-                        <Typography variant="h1" fontWeight={300}>
-                        {heldOrders.length}
+                        <Typography
+                            variant="h1"
+                            fontWeight={300}
+                            onClick={() => setListView("held")}
+                            sx={{
+                                cursor: "pointer",
+                                userSelect: "none",
+                                "&:hover": {
+                                    color: "#0091EA"
+                                }
+                            }}
+                        >
+                            {heldOrders.length}
                         </Typography>
+
                         <Typography variant="caption" color="text.secondary">
-                        Held Orders
+                            Held Orders
                         </Typography>
                     </Grid>
-                    </Grid>
-                </Box>
+                </Grid>
+            </Box>
 
                 {/* Notifications (flat) */}
                 <Box sx={{ pt: 1 }}>
@@ -347,7 +380,7 @@ return (
         )}
         </Grid>
         {/* Mobile FAB */}
-        {!isLgUp && (
+        {!isDesktop && (
             <Fab component={NavLink} to="/workorders/create" color="secondary" sx={{ position: "fixed", right: 16, bottom: 16 }}>
                 <AddIcon />
             </Fab>

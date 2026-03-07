@@ -30,10 +30,13 @@ export default function AppLayout() {
     const { logout, user } = useAuth();    
     const navigate = useNavigate();
 
-    const theme = useTheme();
-    const isSmDown = useMediaQuery(theme.breakpoints.down("sm"));
-    const isMdUp   = useMediaQuery(theme.breakpoints.up("md"));
-    const isLgUp   = useMediaQuery(theme.breakpoints.up("lg"));
+    const theme = useTheme();    
+    const isDesktop   = useMediaQuery(theme.breakpoints.up("lg"));
+
+    const debug = {
+        width: window.innerWidth,
+        isDesktop
+    };
 
     const [profile, setProfile] = useState(null);
 
@@ -65,21 +68,7 @@ export default function AppLayout() {
     const [userMenuEl, setUserMenuEl] = useState(null);
     const userMenuOpen = Boolean(userMenuEl);
 
-    const [drawerOpen, setDrawerOpen] = useState(() => {
-        //default open on tablet/desktop, closed on phone
-        const saved = localStorage.getItem("soar.drawerOpen");
-        return saved ? saved === "true" : !isSmDown;
-    });
-
-    useEffect(() => {
-        // When switching between phone/non-phone, adjust default behavior
-        if (isSmDown) setDrawerOpen(false);
-        if (!isSmDown && localStorage.getItem("soar.drawerOpen") === null) setDrawerOpen(true);
-    }, [isSmDown]);
-
-    useEffect(() => {
-        localStorage.setItem("soar.drawerOpen", String(drawerOpen));
-    }, [drawerOpen]);
+    const [drawerOpen, setDrawerOpen] = useState(false);    
     
     const handleLogout = async () => {
         await logout();
@@ -106,13 +95,26 @@ export default function AppLayout() {
 
     const drawerContent = (
         <Box>
-            {isSmDown && <Toolbar />}
-            <Box sx={{ px:3, height: 64, display: "flex", alignItems: "center" }}>
-                <Typography sx={{ color: "#fff", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", fontSize: "1.05rem", lineHeight: 1}}>
-                    SOAR
-                </Typography>                
-            </Box>
-            <Divider sx={{ borderColor: "rgba(123,127,146,0.3)" }} />
+            {!isDesktop && <Toolbar />}
+            {isDesktop && (
+                <>
+                    <Box sx={{ px: 3, height: 64, display: "flex", alignItems: "center" }}>
+                        <Typography
+                            sx={{
+                                color: "#fff",
+                                fontWeight: 800,
+                                letterSpacing: "0.06em",
+                                textTransform: "uppercase",
+                                fontSize: "1.05rem",
+                                lineHeight: 1,
+                            }}
+                        >
+                            SOAR
+                        </Typography>
+                    </Box>
+                    <Divider sx={{ borderColor: "rgba(123,127,146,0.3)" }} />
+                </>
+            )}
             <Box onClick={(e) => setUserMenuEl(e.currentTarget)} sx={{ px: 3, py: 2, display: "flex", alignItems: "center", gap: 1.5, cursor: "pointer", userSelect: "none", "&:hover": { bgcolor: "rgba(255,255,255,0.05)" } }}>
                 <Box
                     sx={{
@@ -192,9 +194,9 @@ export default function AppLayout() {
     return(
         
        <Box sx={{ display: "flex", bgcolor: "rgba(240,243,246,1)" }}>        
-        <AppBar position="fixed" sx={{ display: { xs: "flex", lg: "none" }, zIndex: (t) => t.zIndex.drawer + 1}}>
+        <AppBar position="fixed" sx={{ display: isDesktop ? "none" : "flex", zIndex: (t) => t.zIndex.drawer + 1 }}>
             <Toolbar>
-                {!isLgUp && (
+                {!isDesktop && (
                     <IconButton
                         color="inherit"
                         edge="start"
@@ -210,32 +212,28 @@ export default function AppLayout() {
                 </Typography>                
             </Toolbar>
         </AppBar>
-        
-        {!isMdUp && (
+
+        {!isDesktop && (
             <Drawer
                 variant="temporary"
                 anchor="left"
                 open={drawerOpen}
                 onClose={() => setDrawerOpen(false)}
-                ModalProps={{ keepMounted: true }}
-                sx={{ "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", bgcolor: "#212432", color: "#fff" } }}
+                ModalProps={{ keepMounted: true}}
+                sx={{
+                    "& .MuiDrawer-paper": {
+                        width: drawerWidth,
+                        boxSizing: "border-box",
+                        bgcolor: "#212432",
+                        color: "#fff"
+                    } 
+                }}
             >
                 {drawerContent}
             </Drawer>
-        )}
+        )}        
 
-        {isMdUp && !isLgUp && (
-            <Drawer
-                variant="persistent"
-                anchor="left"
-                open={drawerOpen}
-                sx={{ flexShrink: 0, "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box", bgcolor: "#212432", color: "#fff" } }}            
-            >
-                {drawerContent}
-            </Drawer>
-        )}
-
-        {isLgUp && (
+        {isDesktop && (
             <Drawer
                 variant="permanent"
                 open
@@ -251,10 +249,12 @@ export default function AppLayout() {
             sx={{
                 flexGrow: 1,
                 p: 0,
-                ml: isLgUp ? `${drawerWidth}px` : isMdUp && !isLgUp && drawerOpen ? `${drawerWidth}px` : 0, transition: "margin-left 200ms ease",
+                ml: isDesktop ? `${drawerWidth}px` : 0,
+                transition: "margin-left 200ms ease",
                 bgcolor: "rgba(240,243,246,1)" 
             }}
-        >            
+        >       
+            {!isDesktop && <Toolbar/>}
             <Outlet />
         </Box>
         <Menu
