@@ -37,7 +37,7 @@ export default function WorkOrderDetailModal() {
         } else {
             navigate("/workorders");
         }
-        };
+        };    
     
     const participants = useMemo(() => {
     // start with whatever is already on the workorder, if present

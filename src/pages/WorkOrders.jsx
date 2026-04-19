@@ -1,14 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { fetchWorkOrders } from "../services/workOrders";
-import { AppBar, Box, Button, ButtonGroup, Card, CardContent, Chip, Divider, Fab, Grid, Stack, Toolbar, Typography, useMediaQuery, useTheme } from "@mui/material";
+import { AppBar, Box, Button, Card, CardContent, Chip, Divider, Fab, Grid, Stack, Toolbar, Typography, useMediaQuery, useTheme } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import { Link, Outlet, useLocation, NavLink } from "react-router-dom";
-import { formatMaybeTimestamp } from "../lib/dates";
+import { Link, Outlet, useLocation, NavLink, useOutletContext } from "react-router-dom";
+import { formatMaybeTimestamp, formatRelativeTime } from "../lib/dates";
 import siteNav from "../app/nav/siteNav";
 import WorkOrderFilterGroup from "../components/workorders/WorkOrderFilterGroup";
 
 export default function WorkOrders() {
     const location = useLocation();
+    
+    const {
+        notifications = [],
+        notificationsLoading = false,
+        notificationsError = ""
+    } = useOutletContext() || {};
+
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState("");
@@ -28,7 +35,7 @@ export default function WorkOrders() {
 
     const LIST_TOP_PADDING = isDesktop ? PAGE_HEADER_H : PAGE_HEADER_H + MOBILE_FILTER_H + 56;
 
-    const drawerWidth = 270;
+    const drawerWidth = 270;    
 
     useEffect(() => {
         let cancelled = false;
@@ -66,7 +73,7 @@ const { openOrders, completedOrders, heldOrders } = useMemo(() => {
     const heldOrders = [];
 
     for (const o of orders) {
-        const s = norm(o.status);   // <-- define s here
+        const s = norm(o.status);
         if (s === "held" || s === "hold") heldOrders.push(o);
         else if (s === "completed" || s === "complete") completedOrders.push(o);
         else openOrders.push(o);
@@ -367,24 +374,98 @@ return (
 
                 {/* Notifications (flat) */}
                 <Box sx={{ pt: 1 }}>
-                    <Typography variant="h4" fontWeight={500} sx={{ mb: 1 }}>
-                    Notifications
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                    COMING SOON
-                    </Typography>
+                    <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        sx={{ mb: 1.5 }}
+                    >
+                        <Typography variant="h4" fontWeight={500}>
+                            Notifications
+                        </Typography>
+                        <Button
+                            size="small"                            
+                            sx={{
+                                minWidth: 0,
+                                px: 0,
+                                fontWeight: 700,
+                                color: "#0091ea"
+                            }}
+                        >
+                            VIEW ALL
+                        </Button>
+                    </Stack>
+                    {notificationsLoading && (
+                        <Typography variant="body2" color="text.secondary">
+                            Loading notifications...
+                        </Typography>
+                    )}
+
+                    {!notificationsLoading && notificationsError && (
+                        <Typography variant="body2" color="error">
+                            {notificationsError}
+                        </Typography>
+                    )}
+
+                    {!notificationsLoading && !notificationsError && notifications.length === 0 && (
+                        <Typography variant="body2" color="text.secondary">
+                            No notifications yet.
+                        </Typography>
+                    )}
+
+                    {!notificationsLoading && !notificationsError && notifications.length > 0 && (
+                        <Stack spacing={0}>
+                            {notifications
+                                .filter((item) => item?.id)
+                                .slice(0, 5)
+                                .map((item, index, arr) => (
+                                    <Box
+                                        key={item.id}
+                                        sx={{
+                                            py: 1.5,
+                                            borderBottom: 
+                                                index !== arr.length - 1
+                                                    ? "1px dotted rgba(0,0,0,0.12)"
+                                                    : "none"
+                                        }}
+                                    >
+                                        <Stack
+                                            direction="row"
+                                            alignItems="flex-start"
+                                            justifyContent="space-between"
+                                            spacing={1}
+                                            sx={{ mb: 0.5 }}
+                                        >
+                                            <Typography variant="body2" sx={{ pr:1 }}>
+                                                <Box component="span" sx={{ fontWeight: 700 }}>
+                                                    {item.user || "System"}
+                                                </Box>{" "}
+                                                {item.content}
+                                            </Typography>
+
+                                            <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
+                                                {formatRelativeTime(item.time)}
+                                            </Typography>
+                                        </Stack>                                    
+                                    </Box>
+                                )                            
+                            )}
+                        </Stack>
+                    )}
                 </Box>
                 </Stack>
             </Box>
             </Grid>
         )}
         </Grid>
+
         {/* Mobile FAB */}
         {!isDesktop && (
             <Fab component={NavLink} to="/workorders/create" color="secondary" sx={{ position: "fixed", right: 16, bottom: 16 }}>
                 <AddIcon />
             </Fab>
         )}
+
         <Outlet context={{ orders, updateWorkOrderInList }}/>
     </Box>
 )

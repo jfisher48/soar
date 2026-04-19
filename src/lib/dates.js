@@ -32,3 +32,31 @@ export function formatShortDate(v) {
     return "—";
   }
 }
+
+export function formatRelativeTime(timestamp) {
+    if (!timestamp?.seconds) return "";
+
+    const nowMs = Date.now();
+    const timeMs = timestamp.seconds * 1000;
+    const diffMs = nowMs - timeMs;
+
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+
+    if (diffMs < minute) return "Just Now";
+
+    if (diffMs < hour) {
+        const minutes = Math.floor(diffMs / minute);
+        return `${minutes} minute${minutes === 1 ? "" : "s"} ago`; 
+    }
+
+    if (diffMs < day) {
+        const hours = Math.floor(diffMs / hour);
+        return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+    }
+
+    const days = Math.floor(diffMs / day);
+    return `${days} day${days === 1 ? "" : "s"} ago`;
+
+}

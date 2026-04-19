@@ -1,14 +1,33 @@
 import { useEffect, useState } from "react";
-import { Box, Drawer, List, ListItemButton, ListItemText, Menu, MenuItem, Toolbar, AppBar, Typography, Divider, IconButton, Stack } from "@mui/material";
+import { Box, Button, Drawer, List, ListItemButton, ListItemText, Menu, MenuItem, Toolbar, AppBar, Typography, Divider, IconButton, Stack } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
+import CloseIcon from "@mui/icons-material/Close";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import siteNav from "../app/nav/siteNav.js";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import useNotifications from "../hooks/useNotifications.jsx";
+import { formatRelativeTime } from "../lib/dates.js";
+
+function getTimeMs(val) {
+    if (!val) return 0;
+
+    if (typeof val.toMillis === "function") {
+        return val.toMillis();
+    }
+
+    if (typeof val.seconds === "number") {
+        return val.seconds * 1000;
+    }
+
+    const parsed = new Date(val).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+}
 
 const drawerWidth = 270;
 
@@ -22,10 +41,6 @@ const navItems = siteNav.filter((i) => !i.redirect).map((i) => ({
     svgpath: i.svgpath
 }));
 
-console.log(navItems)
-
-console.log("AppLayout mounted")
-
 export default function AppLayout() {
     const { logout, user } = useAuth();    
     const navigate = useNavigate();
@@ -33,12 +48,14 @@ export default function AppLayout() {
     const theme = useTheme();    
     const isDesktop   = useMediaQuery(theme.breakpoints.up("lg"));
 
-    const debug = {
-        width: window.innerWidth,
-        isDesktop
-    };
-
+    
     const [profile, setProfile] = useState(null);
+
+    const {
+        notifications,
+        loading: notificationsLoading,
+        error: notificationsError,
+    } = useNotifications({ user, profile });    
 
     useEffect(() => {
         let cancelled = false;
@@ -68,7 +85,44 @@ export default function AppLayout() {
     const [userMenuEl, setUserMenuEl] = useState(null);
     const userMenuOpen = Boolean(userMenuEl);
 
-    const [drawerOpen, setDrawerOpen] = useState(false);    
+    const [drawerOpen, setDrawerOpen] = useState(false);
+
+    const [notificationsOpen, setNotificationsOpen] = useState(false);    
+
+    const lastSeenMs = getTimeMs(profile?.lastNotificationsSeenAt);
+    
+    const notificationCount = notifications.filter((n) => {
+        const nTime = getTimeMs(n.time);
+        return nTime > lastSeenMs;
+    }).length;
+
+
+
+
+    const handleOpenNotifications = async () => {
+        setDrawerOpen(false);
+        setNotificationsOpen(true);
+
+        if (!user?.uid) return;
+
+        const now = new Date();
+
+        setProfile((prev) => ({
+            ...(prev || {}),
+            lastNotificationsSeenAt: now,
+        }));
+
+        try {
+            await updateDoc(doc(db, "users", user.uid), {
+                lastNotificationsSeenAt: serverTimestamp(),
+            });
+        } catch (e) {
+            console.error("Failed to update lastNotificationsSeenAt", e);
+        }
+    };
+
+
+    const closeNotifications = () => setNotificationsOpen(false);
     
     const handleLogout = async () => {
         await logout();
@@ -194,22 +248,82 @@ export default function AppLayout() {
     return(
         
        <Box sx={{ display: "flex", bgcolor: "rgba(240,243,246,1)" }}>        
-        <AppBar position="fixed" sx={{ display: isDesktop ? "none" : "flex", zIndex: (t) => t.zIndex.drawer + 1 }}>
-            <Toolbar>
+        <AppBar
+            position="fixed"
+            sx={{
+                display: isDesktop ? "none" : "flex",
+                zIndex: (t) => t.zIndex.drawer + 1,
+                bgcolor: "#212432",
+                color: "#fff",
+                boxShadow: "none",
+            }}
+        >
+            <Toolbar sx={{ minHeight: 64 }}>
                 {!isDesktop && (
                     <IconButton
                         color="inherit"
                         edge="start"
-                        onClick={() => setDrawerOpen((v) => !v)}
-                        sx={{ mr: 1}}
+                        onClick={() => {
+                            setNotificationsOpen(false);
+                            setDrawerOpen((v) => !v);
+                        }}
+                        sx={{ mr: 1 }}
                         aria-label="toggle drawer"
                     >
                         <MenuIcon />
-                    </IconButton> 
+                    </IconButton>
                 )}
-                <Typography variant="h6" noWrap sx={{ flexGrow: 1}}>
+
+                <Typography
+                    variant="h6"
+                    noWrap
+                    sx={{
+                        flexGrow: 1,
+                        fontWeight: 700,
+                        letterSpacing: "0.04em",
+                    }}
+                >
                     Soar
-                </Typography>                
+                </Typography>
+
+                {!isDesktop && (
+                    <IconButton
+                        aria-label="open notifications"
+                        onClick={handleOpenNotifications}
+                        sx={{
+                            position: "relative",
+                            color: "#fff",
+                            "&:hover": {
+                                color: "#fff",
+                                bgcolor: "rgba(255,255,255,0.06)",
+                            },
+                        }}
+                    >
+                        <NotificationsOutlinedIcon sx={{ fontSize: 28 }} />
+
+                        {notificationCount > 0 && (
+                            <Box
+                                sx={{
+                                    position: "absolute",
+                                    top: 4,
+                                    right: 2,
+                                    minWidth: 16,
+                                    height: 16,
+                                    px: 0.4,
+                                    borderRadius: 999,
+                                    bgcolor: "#0091EA",
+                                    color: "#fff",
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    lineHeight: "16px",
+                                    textAlign: "center",
+                                }}
+                            >
+                                {notificationCount}
+                            </Box>
+                        )}
+                    </IconButton>
+                )}
             </Toolbar>
         </AppBar>
 
@@ -243,6 +357,117 @@ export default function AppLayout() {
             </Drawer>
         )}
 
+                {!isDesktop && (
+            <Drawer
+                anchor="bottom"
+                open={notificationsOpen}
+                onClose={closeNotifications}
+                PaperProps={{
+                    sx: {
+                        borderTopLeftRadius: 18,
+                        borderTopRightRadius: 18,
+                        maxHeight: "78vh",
+                        overflow: "hidden",
+                    },
+                }}
+            >
+                <Box sx={{ px: 2, pt: 1.25, pb: 2 }}>
+                    <Box
+                        sx={{
+                            width: 42,
+                            height: 5,
+                            borderRadius: 999,
+                            bgcolor: "rgba(0,0,0,0.16)",
+                            mx: "auto",
+                            mb: 1.5,
+                        }}
+                    />
+
+                    <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        sx={{ mb: 1.5 }}
+                    >
+                        <Typography variant="h6" fontWeight={700}>
+                            Notifications
+                        </Typography>
+
+                        <IconButton onClick={closeNotifications} aria-label="close notifications">
+                            <CloseIcon />
+                        </IconButton>
+                    </Stack>
+
+                    {notificationsLoading && (
+                        <Typography variant="body2" color="text.secondary">
+                            Loading notifications...
+                        </Typography>
+                    )}
+
+                    {!notificationsLoading && notificationsError && (
+                        <Typography variant="body2" color="error">
+                            {notificationsError}
+                        </Typography>
+                    )}
+
+                    {!notificationsLoading && !notificationsError && notifications.length === 0 && (
+                        <Typography variant="body2" color="text.secondary">
+                            No notifications yet.
+                        </Typography>
+                    )}
+
+                    {!notificationsLoading && !notificationsError && notifications.length > 0 && (
+                        <Stack spacing={0}>
+                            {notifications
+                                .filter((item) => item?.id)
+                                .map((item, index, arr) => (
+                                    <Box
+                                        key={item.id}
+                                        sx={{
+                                            py: 1.5,
+                                            borderBottom:
+                                                index !== arr.length - 1
+                                                    ? "1px dotted rgba(0,0,0,0.28)"
+                                                    : "none",
+                                        }}
+                                    >
+                                        <Stack
+                                            direction="row"
+                                            alignItems="flex-start"
+                                            justifyContent="space-between"
+                                            spacing={1}
+                                            sx={{ mb: 0.5 }}
+                                        >
+                                            <Typography variant="subtitle2" fontWeight={700}>
+                                                {String(item.user || "SYSTEM").toUpperCase()}
+                                            </Typography>
+
+                                            <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                sx={{ flexShrink: 0, whiteSpace: "nowrap" }}
+                                            >
+                                                {formatRelativeTime(item.time)}
+                                            </Typography>
+                                        </Stack>
+
+                                        <Typography variant="body2" color="text.secondary">
+                                            {item.content}
+                                        </Typography>
+                                    </Box>
+                                ))}
+                        </Stack>
+                    )}
+
+                    <Box sx={{ pt: 2 }}>
+                        <Button fullWidth variant="outlined" onClick={closeNotifications}>
+                            CLOSE
+                        </Button>
+                    </Box>
+                </Box>
+            </Drawer>
+        )}
+
         {/* Main Content */}
         <Box
             component="main"
@@ -255,7 +480,13 @@ export default function AppLayout() {
             }}
         >       
             {!isDesktop && <Toolbar/>}
-            <Outlet />
+            <Outlet
+                context={{
+                    notifications,
+                    notificationsLoading,
+                    notificationsError
+                }}
+            />
         </Box>
         <Menu
             anchorEl={userMenuEl}
