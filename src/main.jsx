@@ -9,6 +9,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./layout/AppLayout";
 import Login from "./pages/Login";
 import WorkOrders from "./pages/WorkOrders";
+import CreateWorkOrder from "./pages/workorders/CreateWorkOrder";
 import WorkOrderDetailModal from "./pages/WorkOrderDetailModal";
 
 function Page({ name }) {
@@ -62,6 +63,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <Route path="/workorders" element={<WorkOrders />}>
                   <Route path=":id" element={<WorkOrderDetailModal />} />
                 </Route>
+                <Route path="/workorders/create" element={<CreateWorkOrder />} />
                 <Route path="/reports" element={<Page name="Reports" />} />
                 <Route path="/news" element={<Page name="News" />} />
                 <Route path="/logos" element={<Page name="Logos" />} />
