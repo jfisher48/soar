@@ -52,6 +52,8 @@ export async function createWorkOrder({
   requestedBy = "",
   account = "",
   accountId = "",
+  provisionalAccountId = "",
+  isProvisionalAccount = false,
   orderType = "shelf strip",
 }) {
   const userRef = doc(db, "users", userId);
@@ -93,6 +95,8 @@ export async function createWorkOrder({
       format: "",
       account: account || "",
       accountId: accountId || "",
+      provisionalAccountId: provisionalAccountId || "",
+      isProvisionalAccount: Boolean(isProvisionalAccount),
       cost: "",
       lineCount: 0,
       stripCount: 0,

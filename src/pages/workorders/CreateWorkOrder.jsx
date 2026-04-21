@@ -4,7 +4,9 @@ import { getAuth } from "firebase/auth";
 import { Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Paper, Stack, TextField, Typography } from "@mui/material";
 import { createFilterOptions } from "@mui/material/Autocomplete";
 import { createWorkOrder } from "../../services/workOrders";
-import { getUserAssociatedAccounts } from "../../services/accounts";
+import { createProvisionalAccount, getProvisionalAccountsByRoute, getUserAssociatedAccounts, getUserProfile } from "../../services/accounts";
+import { buildAccountOptions, mapProvisionalAccountToOption } from "../../utils/accountOptions";
+
 
 const filter = createFilterOptions();
 
@@ -12,7 +14,10 @@ export default function CreateWorkOrder() {
     const navigate = useNavigate();
     const auth = getAuth();
 
-    const [accounts, setAccounts] = useState([]);
+    const [accountOptions, setAccountOptions] = useState([]);
+    const [userProfile, setUserProfile] = useState(null);
+    const [newAccountCity, setNewAccountCity] = useState("");
+    const [isSavingAccount, setIsSavingAccount] = useState(false);
     const [selectedAccount, setSelectedAccount] = useState(null);
     const [orderType, setOrderType] = useState("Shelf Strips");
     const [error, setError] = useState("");
@@ -21,19 +26,33 @@ export default function CreateWorkOrder() {
     const [newAccountName, setNewAccountName] = useState("");
 
     useEffect(() => {
-        async function loadAccounts() {
-            const currentUser = auth.currentUser;
-            if (!currentUser) return;
+    async function loadAccounts() {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
 
-            try {
-                const data = await getUserAssociatedAccounts(currentUser.uid);
-                console.log("associatedAccounts result:", data)
-                setAccounts(Array.isArray(data) ? data : []);
-            } catch (err) {
-                setError("Failed to load accounts.");
-            }
+        try {
+        const profile = await getUserProfile(currentUser.uid);    
+        const realAccounts = await getUserAssociatedAccounts(currentUser.uid);
+        const provisionalAccounts = await getProvisionalAccountsByRoute(
+            profile.routeNumber || ""
+        );
+
+        const mergedOptions = buildAccountOptions(
+            Array.isArray(realAccounts) ? realAccounts : [],
+            Array.isArray(provisionalAccounts) ? provisionalAccounts : []
+        );
+
+        console.log("associatedAccounts result:", realAccounts);
+        console.log("provisionalAccounts result:", provisionalAccounts);
+
+        setUserProfile(profile);
+        setAccountOptions(mergedOptions);
+        } catch (err) {
+        setError("Failed to load accounts.");
         }
-        loadAccounts();
+    }
+
+    loadAccounts();
     }, [auth]);
 
     async function handleSubmit(event) {
@@ -53,13 +72,10 @@ export default function CreateWorkOrder() {
             await createWorkOrder({
                 userId: currentUser.uid,
                 requestedBy: currentUser.displayName || "",
-                account: selectedAccount?.account ||
-                selectedAccount?.accountName ||
-                "",
-                accountId: selectedAccount?.id ||
-                selectedAccount?.accountId ||
-                selectedAccount?.accountID ||
-                "",
+                account: selectedAccount?.name || "",
+                accountId: selectedAccount?.accountId || "",
+                provisionalAccountId: selectedAccount?.provisionalId || "",
+                isProvisionalAccount: Boolean(selectedAccount?.isProvisional),
                 orderType,
             });
 
@@ -69,7 +85,64 @@ export default function CreateWorkOrder() {
         } finally {
             setIsSaving(false);
         }
-    }    
+    }
+    
+    function closeAddAccountDialog() {
+        setAddAccountOpen(false);
+        setNewAccountName("");
+        setNewAccountCity("");
+    }
+
+    async function handleSaveProvisionalAccount() {
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+            setError("You must be logged in to add an account");
+            return;
+        }
+
+        if (!newAccountName.trim()) {
+            setError("Account Name is required");
+            return;
+        }
+
+        if (!userProfile?.routeNumber) {
+            setError("Your user profile is missing a route number.");
+            return;
+        }
+
+        try {
+            setError("");
+            setIsSavingAccount(true);
+
+            const createdBy =
+                `${userProfile.firstName || ""} ${userProfile.lastName || ""}`.trim() ||
+                currentUser.displayName ||
+                currentUser.email ||
+                "";
+            
+            const provisionalAccount = await createProvisionalAccount({
+                name: newAccountName,
+                city: newAccountCity,
+                routeNumber: userProfile.routeNumber,
+                createdBy,
+                createdByUid: currentUser.uid
+            });
+
+            const newOption = mapProvisionalAccountToOption(provisionalAccount);
+
+            setAccountOptions((prev) => 
+                [...prev, newOption].sort((a, b) => a.name.localeCompare(b.name))
+            );
+
+            setSelectedAccount(newOption);
+            closeAddAccountDialog();
+        } catch (err) {
+            setError(err.message || "Failed to save account.");
+        } finally {
+            setIsSavingAccount(false);
+        }
+    }
 
     return (
         <Box sx={{ maxWidth: 700 }}>
@@ -98,7 +171,7 @@ export default function CreateWorkOrder() {
 
                             <Autocomplete
                                 freeSolo
-                                options={accounts}
+                                options={accountOptions}
                                 value={selectedAccount}
                                 onChange={(event, newValue) => {
                                     if (newValue?.inputValue) {
@@ -114,9 +187,8 @@ export default function CreateWorkOrder() {
                                     const { inputValue } = params;
 
                                     const isExisting = options.some((option) => {
-                                    const optionLabel =
-                                        option?.account || option?.accountName || option?.name || "";
-                                    return optionLabel.toLowerCase() === inputValue.toLowerCase();
+                                        const optionLabel = option?.name || "";
+                                        return optionLabel.toLowerCase() === inputValue.toLowerCase();
                                     });
 
                                     if (inputValue !== "" && !isExisting) {
@@ -131,11 +203,11 @@ export default function CreateWorkOrder() {
                                 getOptionLabel={(option) => {
                                     if (typeof option === "string") return option;
                                     if (option?.inputValue) return option.label || option.inputValue;
-                                    return option?.account || option?.accountName || option?.name || "";
+                                    return option?.label || option?.name || "";
                                 }}
                                 isOptionEqualToValue={(option, value) => {
-                                    const optionId = option?.id || option?.accountId || option?.accountID || "";
-                                    const valueId = value?.id || value?.accountId || value?.accountID || "";
+                                    const optionId = option?.id || "";
+                                    const valueId = value?.id || "";
                                     return String(optionId) === String(valueId);
                                 }}
                                 selectOnFocus
@@ -148,15 +220,15 @@ export default function CreateWorkOrder() {
                                     required
                                     />
                                 )}
-                                renderOption={(props, option) => (
-                                    <li {...props}>
-                                        {option?.label ||
-                                        option?.account ||
-                                        option?.accountName ||
-                                        option?.name ||
-                                        ""}
-                                    </li>
-                                )}
+                                renderOption={(props, option) => {
+                                    const { key, ...rest } = props;
+
+                                    return (
+                                        <li key={key} {...rest}>
+                                        {option?.label || option?.name || ""}
+                                        </li>
+                                    );
+                                }}
                             />                           
                             
                             <Stack direction="row" spacing={2}>
@@ -186,7 +258,7 @@ export default function CreateWorkOrder() {
                 <DialogContent>
                     <Stack spacing={2} sx={{ mt: 1 }}>
                         <Typography variant="body2" color="text.secondary">
-                            Account Creation will be wired next
+                            This will create a provisional account for your route.
                         </Typography>
                         <TextField
                             label="Account Name"
@@ -194,14 +266,24 @@ export default function CreateWorkOrder() {
                             onChange={(event) => setNewAccountName(event.target.value)}
                             fullWidth
                         />
+                        <TextField
+                            label="City"
+                            value={newAccountCity}
+                            onChange={(event) => setNewAccountCity(event.target.value)}
+                            fullWidth
+                        />
                     </Stack>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setAddAccountOpen(false)}>
+                    <Button onClick={closeAddAccountDialog} disabled={isSavingAccount}>
                         Cancel
                     </Button>
-                    <Button variant="contained" disabled>
-                        Save Account
+                    <Button
+                        variant="contained"
+                        onClick={handleSaveProvisionalAccount}
+                        disabled={isSavingAccount || !newAccountName.trim()}
+                    >
+                        {isSavingAccount ? "Saving..." : "Save Account"}
                     </Button>
                 </DialogActions>
             </Dialog>
