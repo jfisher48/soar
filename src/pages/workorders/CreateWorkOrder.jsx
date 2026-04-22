@@ -73,7 +73,7 @@ export default function CreateWorkOrder() {
                 userId: currentUser.uid,
                 requestedBy: currentUser.displayName || "",
                 account: selectedAccount?.name || "",
-                accountId: selectedAccount?.accountId || "",
+                retailerId: selectedAccount?.isProvisional ? "" : selectedAccount?.id || "",
                 provisionalAccountId: selectedAccount?.provisionalId || "",
                 isProvisionalAccount: Boolean(selectedAccount?.isProvisional),
                 orderType,
@@ -187,7 +187,7 @@ export default function CreateWorkOrder() {
                                     const { inputValue } = params;
 
                                     const isExisting = options.some((option) => {
-                                        const optionLabel = option?.name || "";
+                                        const optionLabel = option?.name || option?.label || "";
                                         return optionLabel.toLowerCase() === inputValue.toLowerCase();
                                     });
 
@@ -206,9 +206,12 @@ export default function CreateWorkOrder() {
                                     return option?.label || option?.name || "";
                                 }}
                                 isOptionEqualToValue={(option, value) => {
-                                    const optionId = option?.id || "";
-                                    const valueId = value?.id || "";
-                                    return String(optionId) === String(valueId);
+                                    const optionKey =
+                                        option?.id || option?.provisionalId || option?.name || "";
+                                    const valueKey =
+                                        value?.id || value?.provisionalId || value?.name || "";                                    
+                                    
+                                    return String(optionKey) === String(valueKey);
                                 }}
                                 selectOnFocus
                                 clearOnBlur
@@ -223,9 +226,15 @@ export default function CreateWorkOrder() {
                                 renderOption={(props, option) => {
                                     const { key, ...rest } = props;
 
+                                    const stableKey =
+                                        option?.inputValue ||
+                                        (option?.isProvisional
+                                            ? `prov-${option?.provisionalId || option?.id || option?.name || ""}`
+                                            : `real-${option?.id || option?.name || option?.label || ""}`);
+
                                     return (
-                                        <li key={key} {...rest}>
-                                        {option?.label || option?.name || ""}
+                                        <li {...rest} key={stableKey}>
+                                            {option?.label || option?.name || ""}
                                         </li>
                                     );
                                 }}

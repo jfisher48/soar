@@ -1,31 +1,33 @@
 export function mapRealAccountToOption(account) {
-    const accountId = account?.accountId || account?.id || ""
+    const retailerId = account?.id || ""
 
     return {
-        id: accountId,
+        id: retailerId,
         name: account?.name || account?.account || account?.accountName || "",
-        accountId,
+        accountId: retailerId,
         provisionalId: null,
         isProvisional: false,
         city: account?.city || null,
+        routeNumber: account?.routeNumber || "",
         label: account?.name || account?.account || account?.accountName || ""
     }
 }
 
 export function mapProvisionalAccountToOption(provisional) {
-  const provisionalId = provisional?.provisionalId || provisional?.id || ""
-  const name = provisional?.name || ""
-  const cityPart = provisional?.city ? ` (${provisional.city})` : ""
+    const provisionalId = provisional?.provisionalId || provisional?.id || ""
+    const name = provisional?.name || ""
+    const cityPart = provisional?.city ? ` (${provisional.city})` : ""
 
-  return {
-    id: provisionalId,
-    name,
-    accountId: null,
-    provisionalId,
-    isProvisional: true,
-    city: provisional?.city || null,
-    label: `${name}${cityPart} — Provisional`,
-  }
+    return {
+        id: provisionalId,
+        name,
+        accountId: null,
+        provisionalId,
+        isProvisional: true,
+        city: provisional?.city || null,
+        routeNumber: provisional?.routeNumber || "",
+        label: `${name}${cityPart} — Provisional`,
+    }
 }
 
 export function buildAccountOptions(accounts = [], provisionalAccounts = []) {

@@ -18,16 +18,31 @@ export async function getUserProfile(userId) {
 export async function getUserAssociatedAccounts(userId) {
   const userData = await getUserProfile(userId);
 
-  const rawAssociatedAccounts = userData.associatedAccounts;
-
-  const associatedAccounts = Array.isArray(rawAssociatedAccounts)
-    ? rawAssociatedAccounts
-    : rawAssociatedAccounts && typeof rawAssociatedAccounts === "object"
-      ? Object.values(rawAssociatedAccounts)
+  const assignedRoutes = Array.isArray(userData.assignedRouteNumbers)
+    ? userData.assignedRouteNumbers
+    : userData.routeNumber
+      ? [userData.routeNumber]
       : [];
 
-  return associatedAccounts
-    .slice()
+  if (!assignedRoutes.length) return [];
+
+  console.log("USER DATA:", userData);
+  console.log("ASSIGNED ROUTES:"), assignedRoutes;
+
+  const retailersRef = collection(db, "retailers");
+
+  const retailersQuery = query(
+    retailersRef,
+    where("routeNumber", "in", assignedRoutes.slice(0, 10))
+  );
+
+  const snapshot = await getDocs(retailersQuery);
+
+  return snapshot.docs
+    .map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }))
     .sort((a, b) => {
       const nameA = String(
         a.account || a.accountName || a.name || ""
