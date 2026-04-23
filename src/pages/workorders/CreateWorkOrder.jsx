@@ -76,6 +76,7 @@ export default function CreateWorkOrder() {
                 retailerId: selectedAccount?.isProvisional ? "" : selectedAccount?.id || "",
                 provisionalAccountId: selectedAccount?.provisionalId || "",
                 isProvisionalAccount: Boolean(selectedAccount?.isProvisional),
+                routeNumber: selectedAccount.routeNumber || "",
                 orderType,
             });
 
@@ -230,11 +231,29 @@ export default function CreateWorkOrder() {
                                         option?.inputValue ||
                                         (option?.isProvisional
                                             ? `prov-${option?.provisionalId || option?.id || option?.name || ""}`
-                                            : `real-${option?.id || option?.name || option?.label || ""}`);
+                                            : `real-${option?.id || option?.name || ""}`);
+
+                                    const secondaryText = option?.address
+                                        ? [option.address, option.city].filter(Boolean).join(", ")
+                                        : option?.city || "";
 
                                     return (
                                         <li {...rest} key={stableKey}>
-                                            {option?.label || option?.name || ""}
+                                            <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+                                                <Typography variant="body1">
+                                                    {option?.label || option?.name || ""}
+                                                </Typography>
+
+                                                {option?.showAddress && secondaryText ? (
+                                                    <Typography
+                                                        variant="body2"
+                                                        color="text.secondary"
+                                                        sx={{ fontSize: "0.85rem" }}
+                                                    >
+                                                        ({secondaryText})
+                                                    </Typography>
+                                                ) : null}
+                                            </Box>
                                         </li>
                                     );
                                 }}

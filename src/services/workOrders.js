@@ -1,5 +1,6 @@
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, runTransaction, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, updateDoc, serverTimestamp, where } from "firebase/firestore";
 import { db } from "../lib/firebase"
+import { Toys } from "@mui/icons-material";
 
 /* Fetches latest work orders */
 
@@ -14,6 +15,72 @@ export async function fetchWorkOrders({ pageSize= 25} = {}) {
         ...doc.data(),
     }));
 }
+
+/* Subscribe to Open Work Orders*/
+
+export function subscribeToOpenWorkOrders({ routeNumbers = [], onUpdate, onError }) {
+  if (!Array.isArray(routeNumbers) || routeNumbers.length === 0) {
+    if (typeof onUpdate === "function") onUpdate([]);
+    return () => {};
+  }
+
+  const colRef = collection(db, "workorders");
+
+  const q = query(
+    colRef,
+    where("routeNumber", "in", routeNumbers.slice(0,10)),
+    where("status", "==", "open"),
+    orderBy("touchedAt", "desc")
+  );
+
+  return onSnapshot(
+    q,
+    (snap) => {
+      const data = snap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      if (typeof onUpdate === "function") {
+        onUpdate(data);
+      }
+    },
+    (error) => {
+      if (typeof onError === "function") {
+        onError(error);
+      }
+    }
+  );
+}
+
+/* Subscribe to Completed Work Orders */
+
+export function subscribeToAggregatedWorkOrders({ userId, bucket = "completed", onUpdate, onError }) {
+    if (!userId) {
+        if (typeof onUpdate === "function") onUpdate([]);
+        return () => {};
+    }
+
+    const ref = doc(db, "aggregatedOrders", `${userId}_${bucket}`);
+
+    return onSnapshot(
+        ref,
+        (snap) => {
+            const data = snap.exists() ? snap.data()?.last100 || [] : [];
+
+            if (typeof onUpdate === "function") {
+                onUpdate(Array.isArray(data) ? data : []);
+            }
+        },
+        (error) => {
+            if (typeof onError === "function") {
+                onError(error);
+            }
+        }
+    );
+}
+
+
 
 /* Fetches work order by Id */
 
@@ -51,9 +118,10 @@ export async function createWorkOrder({
   userId,
   requestedBy = "",
   account = "",
-  accountId = "",
+  retailerId = "",
   provisionalAccountId = "",
   isProvisionalAccount = false,
+  routeNumber = "",
   orderType = "shelf strip",
 }) {
   const userRef = doc(db, "users", userId);
@@ -67,18 +135,23 @@ export async function createWorkOrder({
 
     const userData = userSnap.data();
 
-    const routeNumber = String(userData.routeNumber || "").trim();
+    const requesterRouteNumber = String(userData.routeNumber || "").trim();
+    const accountRouteNumber = String(routeNumber || "").trim();
     const createdOrderCount = Number(userData.createdOrderCount || 0);
     const fullName =
       requestedBy || `${userData.firstName || ""} ${userData.lastName || ""}`.trim();
 
-    if (!routeNumber) {
+    if (!requesterRouteNumber) {
       throw new Error("User routeNumber is missing.");
+    }
+
+    if (!accountRouteNumber) {
+      throw new Error("Account routeNumber is missing.");
     }
 
     const newCount = createdOrderCount + 1;
     const newWorkorderNumber =
-      routeNumber + String(newCount).padStart(7, "0");
+      requesterRouteNumber + String(newCount).padStart(7, "0");
 
     const workOrderRef = doc(db, "workorders", newWorkorderNumber);
 
@@ -88,13 +161,15 @@ export async function createWorkOrder({
       requestedBy: fullName,
       requesterId: userId,
       requesterEmail: userData.email || "",
+      requesterRouteNumber,
+      routeNumber: accountRouteNumber,
       touchedBy: fullName,
       touchedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
       orderType,
       format: "",
       account: account || "",
-      accountId: accountId || "",
+      retailerId: retailerId || "",
       provisionalAccountId: provisionalAccountId || "",
       isProvisionalAccount: Boolean(isProvisionalAccount),
       cost: "",

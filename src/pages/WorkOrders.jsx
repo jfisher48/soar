@@ -1,5 +1,7 @@
-import { useContext, useEffect, useMemo, useState } from "react";
-import { fetchWorkOrders } from "../services/workOrders";
+import { useContext, useEffect, useState } from "react";
+import { getAuth } from "firebase/auth";
+import { getUserProfile } from "../services/accounts";
+import { subscribeToOpenWorkOrders, subscribeToAggregatedWorkOrders } from "../services/workOrders";
 import { AppBar, Box, Button, Card, CardContent, Chip, Divider, Fab, Grid, Stack, Toolbar, Typography, useMediaQuery, useTheme } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { Link, Outlet, useLocation, NavLink, useOutletContext } from "react-router-dom";
@@ -9,6 +11,9 @@ import WorkOrderFilterGroup from "../components/workorders/WorkOrderFilterGroup"
 
 export default function WorkOrders() {
     const location = useLocation();
+
+    const auth = getAuth();
+    const [userRoutes, setUserRoutes] = useState([]);
     
     const {
         notifications = [],
@@ -16,7 +21,9 @@ export default function WorkOrders() {
         notificationsError = ""
     } = useOutletContext() || {};
 
-    const [orders, setOrders] = useState([]);
+    const [openOrders, setOpenOrders] = useState([]);
+    const [completedOrders, setCompletedOrders] = useState([]);
+    const [heldOrders, setHeldOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState("");
 
@@ -38,49 +45,85 @@ export default function WorkOrders() {
     const drawerWidth = 270;    
 
     useEffect(() => {
-        let cancelled = false;
+        let unsubscribeOpen = null;
+        let unsubscribeBucket = null;
 
-        (async () => {
+        const init = async () => {
             setLoading(true);
             setErr("");
+
             try {
-            const data = await fetchWorkOrders({ pageSize: 25 });
-            if (!cancelled) setOrders(data);
+                const user = auth.currentUser;
+                if (!user) throw new Error("No authenticated user.");
+
+                const profile = await getUserProfile(user.uid);
+
+                const routes = Array.isArray(profile.assignedRouteNumbers)
+                    ? profile.assignedRouteNumbers.map(String)
+                    : profile.routeNumber
+                        ? [String(profile.routeNumber)]
+                        : [];
+
+                setUserRoutes(routes);
+
+                unsubscribeOpen = subscribeToOpenWorkOrders({
+                    routeNumbers: routes,
+                    onUpdate: (data) => {
+                        setOpenOrders(data);
+                        if (listView === "open") setLoading(false);
+                    },
+                    onError: (error) => {
+                        setErr(error?.message || "Failed to subscribe to open work orders.");
+                        setLoading(false);
+                    }
+                });
+
+                const bucket = listView;
+
+                if (listView === "completed" || listView === "held") {
+                    unsubscribeBucket = subscribeToAggregatedWorkOrders({
+                        userId: user.uid,
+                        bucket: listView,
+                        onUpdate: (data) => {
+                            if (bucket === "completed") {
+                                setCompletedOrders(data);
+                            } else {
+                                setHeldOrders(data);
+                            }
+                            setLoading(false);
+                        },
+                        onError: (error) => {
+                            setErr(error?.message || `Failed to subscribe to ${listView} work orders.`);
+                            setLoading(false);
+                        }
+                    });
+                }
             } catch (e) {
-            if (!cancelled) setErr(e?.message || "Failed to load work orders.");
-            } finally {
-            if (!cancelled) setLoading(false);
+                setErr(e?.message || "Failed to initialize work orders.");
+                setLoading(false);
             }
-        })();
+        };
+
+        init();
 
         return () => {
-            cancelled = true;
+            if (typeof unsubscribeOpen === "function") {
+                unsubscribeOpen();
+            }
+            if (typeof unsubscribeBucket === "function") {
+                unsubscribeBucket();
+            }
         };
-    }, []);
+    }, [listView, auth]);
 
 const updateWorkOrderInList = (patch) => {
-    // patch: {id,status,touchedAt,touchedBy}
-    setOrders((prev) =>
-        prev.map((o) => (o.id === patch.id ? { ...o, ...patch } : o))
-        );
+    const applyPatch = (prev) =>
+        prev.map((o) => (o.id === patch.id ? { ...o, ...patch } : o));
+
+    setOpenOrders(applyPatch);
+    setCompletedOrders(applyPatch);
+    setHeldOrders(applyPatch);
 }
-
-const { openOrders, completedOrders, heldOrders } = useMemo(() => {
-    const norm = (s) => String(s || "").toLowerCase();
-
-    const openOrders = [];
-    const completedOrders = [];
-    const heldOrders = [];
-
-    for (const o of orders) {
-        const s = norm(o.status);
-        if (s === "held" || s === "hold") heldOrders.push(o);
-        else if (s === "completed" || s === "complete") completedOrders.push(o);
-        else openOrders.push(o);
-    }
-
-    return { openOrders, completedOrders, heldOrders };    
-}, [orders]);
 
 const activeOrders = listView === "open" ? openOrders : listView === "completed" ? completedOrders: heldOrders;
 
@@ -229,7 +272,7 @@ return (
                     return (
                         <Card
                         component={Link}
-                        key={wo.id}
+                        key={wo.id || wo.workorderNumber}
                         to={`/workorders/${wo.id}`}
                         state={{ backgroundLocation: location }}
                         sx={{
@@ -466,7 +509,7 @@ return (
             </Fab>
         )}
 
-        <Outlet context={{ orders, updateWorkOrderInList }}/>
+        <Outlet context={{ openOrders, completedOrders, heldOrders, updateWorkOrderInList }}/>
     </Box>
 )
 

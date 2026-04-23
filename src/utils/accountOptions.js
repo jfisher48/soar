@@ -7,6 +7,7 @@ export function mapRealAccountToOption(account) {
         accountId: retailerId,
         provisionalId: null,
         isProvisional: false,
+        address: account?.address || null,
         city: account?.city || null,
         routeNumber: account?.routeNumber || "",
         label: account?.name || account?.account || account?.accountName || ""
@@ -33,11 +34,26 @@ export function mapProvisionalAccountToOption(provisional) {
 export function buildAccountOptions(accounts = [], provisionalAccounts = []) {
     const realOptions = accounts
         .map(mapRealAccountToOption)
-        .sort((a, b) => a.name.localeCompare(b.name))
+        .sort((a, b) => a.name.localeCompare(b.name));
 
     const provisionalOptions = provisionalAccounts
         .map(mapProvisionalAccountToOption)
-        .sort((a, b) => a.name.localeCompare(b.name))
+        .sort((a, b) => a.name.localeCompare(b.name));
 
-    return [...realOptions, ...provisionalOptions]
+    const combined = [...realOptions, ...provisionalOptions];
+
+    const nameCounts = combined.reduce((acc, option) => {
+        const key = (option?.name || "").trim().toLowerCase();
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+    }, {});
+
+    return combined.map((option) => {
+        const nameKey = (option?.name || "").trim().toLowerCase();
+
+        return {
+            ...option,
+            showAddress: nameCounts[nameKey] > 1,
+        };
+    });
 }
